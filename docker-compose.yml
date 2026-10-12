@@ -1,0 +1,12 @@
+services:
+  anotado:
+    image: ghcr.io/jorges15/anotado:latest
+    container_name: anotado
+    restart: unless-stopped
+    environment:
+      ANOTADO_PASSWORD: muda-esta-password
+      TZ: Europe/Lisbon
+    volumes:
+      - ./data:/data
+    ports:
+      - "4008:4008"
