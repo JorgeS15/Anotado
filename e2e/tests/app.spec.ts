@@ -40,6 +40,8 @@ test('offline edits are kept and sent when back online', async ({ page, context,
   const pc = await newDevice(browser);
   await expect(card(pc.page, 'Offline')).toBeVisible();
 
+  // Reloading offline needs the service worker to have finished caching the app.
+  await page.evaluate(() => navigator.serviceWorker.ready.then(() => undefined));
   await context.setOffline(true);
   await card(page, 'Offline').click();
   await page.fill('.editor .content', 'editado sem rede');
