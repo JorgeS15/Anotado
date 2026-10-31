@@ -1,10 +1,12 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
   import { autogrow } from '../lib/autogrow';
+  import { now } from '../lib/clock';
   import { store } from '../lib/store.svelte';
   import type { Color, Note } from '../lib/types';
-  import { findLinks, formatFull, isEmpty, itemsToText, textToItems } from '../lib/util';
+  import { findLinks, formatFull, isEmpty, itemsToText, textToItems, uid } from '../lib/util';
   import Checklist from './Checklist.svelte';
+  import History from './History.svelte';
   import ColorPicker from './ColorPicker.svelte';
   import Icon from './Icon.svelte';
   import Popover from './Popover.svelte';
@@ -13,11 +15,14 @@
     id,
     draft,
     onclose,
+    onopen,
     notify,
   }: {
     id: string;
     draft?: Note;
     onclose: () => void;
+    /** Opens another note in place of this one. */
+    onopen: (id: string) => void;
     notify: (message: string, undo?: () => void) => void;
   } = $props();
 
@@ -30,6 +35,7 @@
   let contentEl = $state<HTMLTextAreaElement>();
   let colorOpen = $state(false);
   let moreOpen = $state(false);
+  let historyOpen = $state(false);
 
   onMount(async () => {
     if (!draft) return;
@@ -53,10 +59,10 @@
       return;
     }
     const filled = note.items.filter((i) => i.text.trim());
-    if (filled.length !== note.items.length) {
-      note.items = filled;
-      changed();
-    }
+    const cleaned = filled.length !== note.items.length;
+    if (cleaned) note.items = filled;
+    // A note created with content (e.g. shared from another app) is saved even if untouched.
+    if (cleaned || !store.notes[id]) changed();
     store.persistNow();
   }
 
@@ -105,7 +111,7 @@
       return;
     }
     const noteId = id;
-    note.deleted_at = Date.now();
+    note.deleted_at = now();
     changed();
     onclose();
     notify('Nota movida para o lixo', () => store.update(noteId, { deleted_at: null }));
@@ -125,6 +131,49 @@
     store.purge(noteId);
     onclose();
     notify('Nota apagada');
+  }
+
+  function asText(n: Note) {
+    const body =
+      n.type === 'checklist' ? n.items.map((i) => `${i.done ? '☑' : '☐'} ${i.text}`).join('\n') : n.content;
+    return n.title ? `${n.title}\n\n${body}` : body;
+  }
+
+  async function share() {
+    if (!note) return;
+    const text = asText(note);
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: note.title || undefined, text });
+        return;
+      } catch (err) {
+        if ((err as DOMException).name === 'AbortError') return;
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      notify('Nota copiada para a área de transferência');
+    } catch {
+      notify('Não foi possível partilhar a nota');
+    }
+  }
+
+  function duplicate() {
+    if (!note || isEmpty(note)) return;
+    const copy = $state.snapshot(note) as Note;
+    const time = now();
+    const dup: Note = {
+      ...copy,
+      id: uid(),
+      items: copy.items.map((i) => ({ ...i, id: uid() })),
+      pinned: false,
+      created_at: time,
+      updated_at: time,
+      synced: undefined,
+    };
+    store.put(dup, false);
+    onopen(dup.id);
+    notify('Nota duplicada');
   }
 
   function hostname(url: string) {
@@ -165,6 +214,11 @@
               <button class="item" onclick={() => (close(), convert())}>
                 <Icon name={note.type === 'text' ? 'checklist' : 'text'} />
                 {note.type === 'text' ? 'Converter em checklist' : 'Converter em texto'}
+              </button>
+              <button class="item" onclick={() => (close(), share())}><Icon name="share" /> Partilhar</button>
+              <button class="item" onclick={() => (close(), duplicate())}><Icon name="copy" /> Duplicar</button>
+              <button class="item" onclick={() => (close(), (historyOpen = true))}>
+                <Icon name="history" /> Histórico
               </button>
               <button class="item" onclick={() => (close(), toggleArchive())}>
                 <Icon name={note.archived ? 'unarchive' : 'archive'} />
@@ -221,6 +275,15 @@
       </footer>
     </div>
   </div>
+  {#if historyOpen}
+    <History
+      {id}
+      onclose={() => (historyOpen = false)}
+      onrestored={() => {
+        historyOpen = false;
+        notify('Versão restaurada');
+      }} />
+  {/if}
 {/if}
 
 <style>
