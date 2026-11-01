@@ -12,6 +12,37 @@ permissions:
   packages: write
 
 jobs:
+  # Reads the app version and whether it still needs a release (no vX.Y.Z tag yet).
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      release: ${{ steps.v.outputs.release }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: v
+        run: |
+          version=$(node -p "require('./server/package.json').version")
+          for pkg in web e2e; do
+            other=$(node -p "require('./$pkg/package.json').version")
+            if [ "$other" != "$version" ]; then
+              echo "::error::Version mismatch: server is $version but $pkg is $other"
+              exit 1
+            fi
+          done
+          if ! grep -q "^## \[$version\]" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no entry for $version"
+            exit 1
+          fi
+          release=false
+          if [ "$GITHUB_EVENT_NAME" = push ] && [ "$GITHUB_REF" = refs/heads/main ] \
+            && ! git ls-remote --exit-code --tags origin "refs/tags/v$version" >/dev/null; then
+            release=true
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "release=$release" >> "$GITHUB_OUTPUT"
+          echo "Version $version, new release: $release"
+
   check:
     runs-on: ubuntu-latest
     steps:
@@ -59,7 +90,7 @@ jobs:
           retention-days: 7
 
   image:
-    needs: [check, e2e]
+    needs: [version, check, e2e]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -75,11 +106,17 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository }}
+          # Version tags come from a manually pushed vX.Y.Z tag, or from a new
+          # version merged to main (tags created by the release job below do
+          # not start another workflow run, so they are published here).
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
+            type=semver,pattern={{version}},value=v${{ needs.version.outputs.version }},enable=${{ needs.version.outputs.release == 'true' }}
+            type=semver,pattern={{major}}.{{minor}},value=v${{ needs.version.outputs.version }},enable=${{ needs.version.outputs.release == 'true' }}
+            type=semver,pattern={{major}},value=v${{ needs.version.outputs.version }},enable=${{ needs.version.outputs.release == 'true' }}
             type=sha,format=short
       - uses: docker/build-push-action@v6
         with:
@@ -90,3 +127,32 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # Creates the vX.Y.Z tag and GitHub release once the image for a new version is published.
+  release:
+    needs: [version, image]
+    if: needs.version.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - name: Release notes from CHANGELOG.md
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          awk -v v="$VERSION" '
+            index($0, "## [" v "]") == 1 { on = 1; next }
+            on && /^## \[/ { exit }
+            on { print }
+          ' CHANGELOG.md > notes.md
+          {
+            echo
+            echo "**Imagem Docker:** \`ghcr.io/${GITHUB_REPOSITORY,,}:$VERSION\`"
+          } >> notes.md
+          cat notes.md
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: gh release create "v$VERSION" --target "$GITHUB_SHA" --title "Anotado $VERSION" --notes-file notes.md
