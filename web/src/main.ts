@@ -1,8 +1,10 @@
 import { mount } from 'svelte';
 import { registerSW } from 'virtual:pwa-register';
 import App from './App.svelte';
-import { pwa } from './lib/pwa.svelte';
+import { listenForInstall, pwa } from './lib/pwa.svelte';
 import './app.css';
+
+listenForInstall();
 
 const updateSW = registerSW({
   immediate: true,

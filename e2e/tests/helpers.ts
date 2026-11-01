@@ -27,6 +27,22 @@ export async function createTextNote(page: Page, title: string, content: string)
   await expect(page.locator('.editor')).toHaveCount(0);
 }
 
+/** Contents of the notes stored on the device (IndexedDB), as the app reads them on start. */
+export function localNoteContents(page: Page): Promise<string[]> {
+  return page.evaluate(
+    () =>
+      new Promise<string[]>((resolve, reject) => {
+        const open = indexedDB.open('anotado-notes');
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+          const req = open.result.transaction('notes').objectStore('notes').getAll();
+          req.onsuccess = () => resolve(req.result.map((n: { content: string }) => n.content));
+          req.onerror = () => reject(req.error);
+        };
+      }),
+  );
+}
+
 export function card(page: Page, title: string) {
   return page.locator('.card', { has: page.locator('h3', { hasText: title }) });
 }

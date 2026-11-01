@@ -83,8 +83,13 @@ Não exponhas a porta 4008 diretamente à internet; usa sempre o Caddy à frente
 
 ### Instalar no telemóvel
 
-Abre o endereço no Chrome (Android), entra com a password e escolhe
-**⋮ → Adicionar ao ecrã principal / Instalar app**. No iPhone: Safari → Partilhar → **Adicionar ao ecrã principal**.
+Abre o endereço no **Chrome** (Android), entra com a password e escolhe **Menu do Anotado → Instalar app**
+(ou **⋮ → Instalar app** no Chrome). A app passa a aparecer na lista de apps e na pesquisa do telemóvel.
+
+> Se escolheres "Adicionar ao ecrã principal → Criar atalho", fica só um atalho (com o símbolo do Chrome no ícone)
+> que não aparece na lista de apps. Nesse caso apaga-o e instala de novo como acima.
+
+No iPhone: Safari → Partilhar → **Adicionar ao ecrã principal**.
 
 Com a app instalada no Android:
 
