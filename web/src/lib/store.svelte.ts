@@ -1,21 +1,23 @@
 import { createStore, del, delMany, entries, set, setMany, values } from 'idb-keyval';
-import type { Note } from './types';
+import { clientId, now, syncClock } from './clock';
+import type { ColorNotePreview, Note, NoteVersion } from './types';
 
 /**
  * Offline-first note store.
  *
  * Every change is applied to memory and IndexedDB first, then queued in an
  * outbox that is pushed to the server whenever it is reachable. The server
- * resolves conflicts with last-write-wins on `updated_at`, and pushes changes
- * from other devices back over Server-Sent Events.
+ * resolves conflicts with last-write-wins on `updated_at` (keeping a
+ * "(conflito)" copy when two devices edited the same note at once), and
+ * pushes changes from other devices back over Server-Sent Events.
  */
 
 type OutboxEntry = { kind: 'put'; note: Note } | { kind: 'delete'; id: string };
 
-class HttpError extends Error {
+export class HttpError extends Error {
   status: number;
-  constructor(status: number) {
-    super(`HTTP ${status}`);
+  constructor(status: number, message?: string) {
+    super(message ?? `HTTP ${status}`);
     this.status = status;
   }
 }
@@ -26,13 +28,22 @@ const AUTH_KEY = 'anotado:authed';
 const SAVE_DELAY = 300;
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = { 'X-Client-Id': clientId };
+  if (typeof init?.body === 'string') headers['Content-Type'] = 'application/json';
   const res = await fetch(path, {
     ...init,
     credentials: 'same-origin',
-    headers: init?.body ? { 'Content-Type': 'application/json' } : undefined,
+    headers: { ...headers, ...(init?.headers as Record<string, string>) },
   });
-  if (!res.ok) throw new HttpError(res.status);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new HttpError(res.status, body.error);
+  }
   return res.json() as Promise<T>;
+}
+
+function snapshot(note: Note): Note {
+  return $state.snapshot(note) as Note;
 }
 
 function rememberAuth(value: boolean) {
@@ -81,6 +92,8 @@ class NoteStore {
       console.warn('IndexedDB indisponível', err);
     }
     this.loaded = true;
+    // Ask the browser not to evict the offline copy when storage runs low.
+    navigator.storage?.persist?.().catch(() => {});
 
     window.addEventListener('online', () => this.sync());
     document.addEventListener('visibilitychange', () => {
@@ -96,7 +109,9 @@ class NoteStore {
 
   async checkSession() {
     try {
-      const { authenticated } = await api<{ authenticated: boolean }>('/api/session');
+      const sentAt = Date.now();
+      const { authenticated, now: serverNow } = await api<{ authenticated: boolean; now: number }>('/api/session');
+      syncClock(serverNow, sentAt, Date.now());
       this.online = true;
       this.setAuth(authenticated);
     } catch {
@@ -155,7 +170,7 @@ class NoteStore {
 
   /** Saves a note (new or changed). Stamps `updated_at` unless `touch` is false. */
   put(note: Note, touch = true) {
-    if (touch) note.updated_at = Math.max(Date.now(), note.updated_at + 1);
+    if (touch) note.updated_at = Math.max(now(), note.updated_at + 1);
     this.notes[note.id] = note;
     this.dirty.add(note.id);
     clearTimeout(this.saveTimer);
@@ -189,7 +204,7 @@ class NoteStore {
     if (!this.dirty.size) return;
     const ids = [...this.dirty];
     this.dirty.clear();
-    const snapshots = ids.map((id) => this.notes[id]).filter(Boolean).map((n) => $state.snapshot(n) as Note);
+    const snapshots = ids.map((id) => this.notes[id]).filter(Boolean).map(snapshot);
     setMany(
       snapshots.map((n) => [n.id, n]),
       notesDb,
@@ -236,11 +251,16 @@ class NoteStore {
           const version = this.versions.get(id) ?? 0;
           try {
             if (entry.kind === 'put') {
-              const res = await api<{ note: Note; applied: boolean }>(`/api/notes/${encodeURIComponent(id)}`, {
-                method: 'PUT',
-                body: JSON.stringify(entry.note),
-              });
-              if (!res.applied && (this.versions.get(id) ?? 0) === version && !this.dirty.has(id)) {
+              // Send the latest known server version, which may be newer than when the edit was queued.
+              const synced = this.notes[id]?.synced ?? entry.note.synced;
+              const res = await api<{ note: Note; applied: boolean; conflict?: Note }>(
+                `/api/notes/${encodeURIComponent(id)}`,
+                { method: 'PUT', body: JSON.stringify({ ...entry.note, synced }) },
+              );
+              if (res.conflict) this.applyRemote(res.conflict, true);
+              if (res.applied) {
+                this.markSynced(id, res.note.updated_at);
+              } else if ((this.versions.get(id) ?? 0) === version && !this.dirty.has(id)) {
                 // The server has a newer version from another device.
                 this.applyRemote(res.note, true);
               }
@@ -292,7 +312,8 @@ class NoteStore {
       seen.add(note.id);
       if (this.hasPending(note.id)) continue;
       const local = this.notes[note.id];
-      if (!local || local.updated_at !== note.updated_at) {
+      if (!local || local.updated_at !== note.updated_at || local.synced !== note.updated_at) {
+        note.synced = note.updated_at;
         this.notes[note.id] = note;
         toStore.push(note);
       }
@@ -310,11 +331,20 @@ class NoteStore {
   }
 
   private applyRemote(note: Note, force = false) {
+    // A pending local edit is pushed later; the server then decides, keeping a copy on conflict.
     if (!force && this.hasPending(note.id)) return;
     const local = this.notes[note.id];
     if (!force && local && local.updated_at > note.updated_at) return;
+    note.synced = note.updated_at;
     this.notes[note.id] = note;
     set(note.id, note, notesDb).catch(() => {});
+  }
+
+  private markSynced(id: string, updatedAt: number) {
+    const note = this.notes[id];
+    if (!note || (note.synced ?? 0) >= updatedAt) return;
+    note.synced = updatedAt;
+    if (!this.dirty.has(id)) set(id, snapshot(note), notesDb).catch(() => {});
   }
 
   private connectEvents() {
@@ -365,7 +395,39 @@ class NoteStore {
     this.retryTimer = undefined;
   }
 
+  // --- History ----------------------------------------------------------------
+
+  async noteVersions(id: string): Promise<NoteVersion[]> {
+    await this.sync();
+    return (await api<{ versions: NoteVersion[] }>(`/api/notes/${encodeURIComponent(id)}/versions`)).versions;
+  }
+
+  async restoreVersion(id: string, versionId: number): Promise<void> {
+    await this.sync();
+    const res = await api<{ note: Note }>(`/api/notes/${encodeURIComponent(id)}/versions/${versionId}/restore`, {
+      method: 'POST',
+    });
+    this.applyRemote(res.note, true);
+  }
+
   // --- Backup -----------------------------------------------------------------
+
+  async previewColorNote(file: File, password: string): Promise<ColorNotePreview> {
+    return api<ColorNotePreview>('/api/colornote/preview', {
+      method: 'POST',
+      body: file,
+      headers: { 'Content-Type': 'application/octet-stream', 'X-Backup-Password': encodeURIComponent(password) },
+    });
+  }
+
+  async importColorNote(preview: ColorNotePreview, colors: Record<number, string>): Promise<string> {
+    const res = await api<{ imported: number; total: number }>('/api/colornote/import', {
+      method: 'POST',
+      body: JSON.stringify({ records: preview.records, colors }),
+    });
+    await this.pull();
+    return `${res.imported} de ${res.total} notas importadas do ColorNote.`;
+  }
 
   async importBackup(file: File): Promise<string> {
     let data: unknown;

@@ -1,21 +1,111 @@
 <script lang="ts">
+  import { highlight } from '../lib/highlight';
   import type { Note } from '../lib/types';
-  import { formatShort } from '../lib/util';
+  import { formatShort, normalize } from '../lib/util';
   import Icon from './Icon.svelte';
 
-  let { note, compact = false, onopen }: { note: Note; compact?: boolean; onopen: () => void } = $props();
+  let {
+    note,
+    compact = false,
+    query = '',
+    selecting = false,
+    selected = false,
+    onopen,
+    onselect,
+  }: {
+    note: Note;
+    compact?: boolean;
+    query?: string;
+    selecting?: boolean;
+    selected?: boolean;
+    onopen: () => void;
+    onselect: () => void;
+  } = $props();
 
   const maxItems = $derived(compact ? 3 : 8);
-  const ordered = $derived([...note.items.filter((i) => !i.done), ...note.items.filter((i) => i.done)]);
+  const q = $derived(normalize(query.trim()));
+  const ordered = $derived.by(() => {
+    const items = [...note.items.filter((i) => !i.done), ...note.items.filter((i) => i.done)];
+    // When searching, show the matching items first.
+    return q ? [...items.filter((i) => normalize(i.text).includes(q)), ...items.filter((i) => !normalize(i.text).includes(q))] : items;
+  });
   const shown = $derived(ordered.slice(0, maxItems));
   const doneCount = $derived(note.items.filter((i) => i.done).length);
+
+  /** If the match is far into a long text, start the preview just before it. */
+  const preview = $derived.by(() => {
+    const at = q ? normalize(note.content).indexOf(q) : -1;
+    if (at < 160) return note.content;
+    const start = note.content.lastIndexOf('\n', at - 40) + 1 || Math.max(0, at - 40);
+    return '…' + note.content.slice(start);
+  });
+
+  // Long press (touch or mouse) and right click start selection.
+  let pressTimer: ReturnType<typeof setTimeout> | undefined;
+  let longPressed = false;
+  let startX = 0;
+  let startY = 0;
+
+  function onpointerdown(e: PointerEvent) {
+    if (e.button !== 0) return;
+    longPressed = false;
+    startX = e.clientX;
+    startY = e.clientY;
+    clearTimeout(pressTimer);
+    pressTimer = setTimeout(() => {
+      longPressed = true;
+      navigator.vibrate?.(15);
+      onselect();
+    }, 500);
+  }
+
+  function onpointermove(e: PointerEvent) {
+    if (Math.abs(e.clientX - startX) > 8 || Math.abs(e.clientY - startY) > 8) clearTimeout(pressTimer);
+  }
+
+  function cancelPress() {
+    clearTimeout(pressTimer);
+  }
+
+  function onclick(e: MouseEvent) {
+    if (longPressed) {
+      longPressed = false;
+      return;
+    }
+    if (selecting || e.ctrlKey || e.metaKey) onselect();
+    else onopen();
+  }
+
+  function oncontextmenu(e: MouseEvent) {
+    e.preventDefault();
+    clearTimeout(pressTimer);
+    if (!longPressed) onselect();
+    longPressed = true;
+  }
 </script>
 
-<button class="card" class:compact style:--note="var(--note-{note.color})" onclick={onopen}>
+{#snippet marked(text: string)}{#each highlight(text, query) as seg, i (i)}{#if seg.match}<mark>{seg.text}</mark>{:else}{seg.text}{/if}{/each}{/snippet}
+
+<button
+  class="card"
+  class:compact
+  class:selected
+  style:--note="var(--note-{note.color})"
+  aria-pressed={selecting ? selected : undefined}
+  {onclick}
+  {onpointerdown}
+  {onpointermove}
+  onpointerup={cancelPress}
+  onpointercancel={cancelPress}
+  onpointerleave={cancelPress}
+  {oncontextmenu}>
+  {#if selecting}
+    <span class="tick" aria-hidden="true"><Icon name={selected ? 'boxChecked' : 'box'} size={20} /></span>
+  {/if}
   {#if note.title || note.pinned}
     <div class="head">
-      {#if note.title}<h3>{note.title}</h3>{/if}
-      {#if note.pinned}<span class="pin" title="Fixada"><Icon name="pin" size={16} /></span>{/if}
+      {#if note.title}<h3>{@render marked(note.title)}</h3>{/if}
+      {#if note.pinned && !selecting}<span class="pin" title="Fixada"><Icon name="pin" size={16} /></span>{/if}
     </div>
   {/if}
 
@@ -24,7 +114,7 @@
       {#each shown as item (item.id)}
         <li class:done={item.done}>
           <Icon name={item.done ? 'boxChecked' : 'box'} size={16} />
-          <span>{item.text}</span>
+          <span>{@render marked(item.text)}</span>
         </li>
       {/each}
     </ul>
@@ -34,7 +124,7 @@
       </p>
     {/if}
   {:else if note.content}
-    <p class="text">{note.content}</p>
+    <p class="text">{@render marked(preview)}</p>
   {/if}
 
   {#if !note.title && !note.content && !note.items.length}
@@ -46,6 +136,9 @@
 
 <style>
   .card {
+    position: relative;
+    -webkit-touch-callout: none;
+    user-select: none;
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -59,6 +152,29 @@
     border: 1px solid var(--border);
     overflow: hidden;
     transition: transform 0.12s ease;
+  }
+
+  .card.selected {
+    outline: 3px solid var(--text);
+    outline-offset: 1px;
+  }
+
+  .tick {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    opacity: 0.8;
+  }
+
+  .selected .tick {
+    opacity: 1;
+  }
+
+  mark {
+    background: color-mix(in srgb, var(--accent) 45%, transparent);
+    color: inherit;
+    border-radius: 3px;
+    padding: 0 1px;
   }
 
   .card:active {

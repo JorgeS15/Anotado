@@ -1,10 +1,15 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { SvelteSet } from 'svelte/reactivity';
+  import ColorNoteImport from './components/ColorNoteImport.svelte';
+  import ColorPicker from './components/ColorPicker.svelte';
   import Editor from './components/Editor.svelte';
   import Icon from './components/Icon.svelte';
   import Login from './components/Login.svelte';
   import NoteCard from './components/NoteCard.svelte';
   import Popover from './components/Popover.svelte';
+  import { now } from './lib/clock';
+  import { pwa } from './lib/pwa.svelte';
   import { store } from './lib/store.svelte';
   import {
     COLORS,
@@ -47,10 +52,36 @@
   let fabOpen = $state(false);
   let searchEl = $state<HTMLInputElement>();
   let importEl = $state<HTMLInputElement>();
+  let colorNoteOpen = $state(false);
+
+  let selectMode = $state(false);
+  const selected = new SvelteSet<string>();
+  let selectColorOpen = $state(false);
+
+  /** A note to create from the URL: Android share target or app shortcut. */
+  let pendingLaunch: { type: NoteType; title?: string; content?: string } | null = null;
 
   onMount(() => {
-    if (history.state?.editor || history.state?.view) history.replaceState(null, '');
+    const url = new URL(location.href);
+    if (url.pathname === '/share') {
+      const title = url.searchParams.get('title') ?? '';
+      const text = url.searchParams.get('text') ?? '';
+      const link = url.searchParams.get('url') ?? '';
+      const content = [text, link && !text.includes(link) ? link : ''].filter(Boolean).join('\n');
+      pendingLaunch = { type: 'text', title, content };
+    } else if (url.searchParams.get('new') === 'text' || url.searchParams.get('new') === 'checklist') {
+      pendingLaunch = { type: url.searchParams.get('new') as NoteType };
+    }
+    if (pendingLaunch || url.pathname !== '/') history.replaceState(null, '', '/');
+    else if (history.state) history.replaceState(null, '');
     store.init();
+  });
+
+  $effect(() => {
+    if (store.auth !== 'yes' || !pendingLaunch) return;
+    const launch = pendingLaunch;
+    pendingLaunch = null;
+    newNote(launch.type, launch.title, launch.content);
   });
 
   // --- Derived lists ---------------------------------------------------------
@@ -101,6 +132,7 @@
 
   function goTo(next: View) {
     if (next === view) return;
+    clearSelection(false);
     if (next === 'notes') {
       if (history.state?.view) history.back();
     } else if (view === 'notes') history.pushState({ view: next }, '');
@@ -115,21 +147,21 @@
     history.pushState({ editor: true, view }, '');
   }
 
-  function newNote(type: NoteType) {
+  function newNote(type: NoteType, title = '', content = '') {
     if (view === 'trash') goTo('notes');
-    const now = Date.now();
+    const time = now();
     const draft: Note = {
       id: uid(),
       type,
-      title: '',
-      content: '',
+      title,
+      content,
       items: type === 'checklist' ? [{ id: uid(), text: '', done: false }] : [],
       color: colorFilter ?? 'yellow',
       pinned: false,
       archived: view === 'archive',
       deleted_at: null,
-      created_at: now,
-      updated_at: now,
+      created_at: time,
+      updated_at: time,
     };
     editing = { id: draft.id, draft };
     history.pushState({ editor: true, view }, '');
@@ -145,15 +177,80 @@
     editing = null;
   }
 
+  /** Replaces the open note with another one (e.g. a duplicate). */
+  function switchNote(id: string) {
+    editor?.finish();
+    editing = { id };
+  }
+
   function onpopstate(e: PopStateEvent) {
     if (editing && !e.state?.editor) finishEditing();
+    if (selectMode && !e.state?.select) {
+      selectMode = false;
+      selected.clear();
+    }
     view = e.state?.view ?? 'notes';
+  }
+
+  // --- Selection ---------------------------------------------------------------
+
+  function toggleSelect(id: string) {
+    if (!selectMode) {
+      selectMode = true;
+      history.pushState({ select: true, view }, '');
+    }
+    if (selected.has(id)) selected.delete(id);
+    else selected.add(id);
+  }
+
+  function startSelect() {
+    if (selectMode) return;
+    selectMode = true;
+    history.pushState({ select: true, view }, '');
+  }
+
+  function clearSelection(popHistory = true) {
+    if (!selectMode) return;
+    selectMode = false;
+    selected.clear();
+    if (popHistory && history.state?.select) history.back();
+  }
+
+  const selectedNotes = $derived([...selected].map((id) => store.notes[id]).filter(Boolean));
+  const allPinned = $derived(selectedNotes.length > 0 && selectedNotes.every((n) => n.pinned));
+
+  function bulk(patch: (n: Note) => Partial<Note>, message: string, undoable = true) {
+    const notes = selectedNotes;
+    const before = notes.map((n) => [n.id, { pinned: n.pinned, archived: n.archived, deleted_at: n.deleted_at, color: n.color }] as const);
+    for (const n of notes) store.update(n.id, patch(n));
+    clearSelection();
+    notify(
+      message.replace('{n}', String(notes.length)),
+      undoable ? () => before.forEach(([id, old]) => store.update(id, old)) : undefined,
+    );
+  }
+
+  function bulkColor(color: Color) {
+    selectColorOpen = false;
+    bulk(() => ({ color }), 'Cor alterada em {n} notas');
+  }
+
+  function bulkDeleteForever() {
+    const ids = [...selected];
+    if (!ids.length || !confirm(`Apagar ${ids.length} ${ids.length === 1 ? 'nota' : 'notas'} para sempre?`)) return;
+    for (const id of ids) store.purge(id);
+    clearSelection();
+    notify('Notas apagadas');
   }
 
   function onkeydown(e: KeyboardEvent) {
     if (e.defaultPrevented || store.auth !== 'yes') return;
     if (editing) {
       if (e.key === 'Escape') closeEditor();
+      return;
+    }
+    if (selectMode) {
+      if (e.key === 'Escape') clearSelection();
       return;
     }
     const target = e.target as HTMLElement;
@@ -222,6 +319,61 @@
 {:else if store.auth === 'no'}
   <Login />
 {:else}
+  {#if selectMode}
+    <header class="top selectbar">
+      <button class="icon-btn" onclick={() => clearSelection()} aria-label="Cancelar seleção"><Icon name="close" /></button>
+      <h1>{selected.size} {selected.size === 1 ? 'selecionada' : 'selecionadas'}</h1>
+      <button
+        class="icon-btn"
+        title="Selecionar todas"
+        onclick={() => visible.forEach((n) => selected.add(n.id))}><Icon name="select" /></button>
+      {#if view === 'trash'}
+        <button
+          class="icon-btn"
+          title="Restaurar"
+          disabled={!selected.size}
+          onclick={() => bulk(() => ({ deleted_at: null }), '{n} notas restauradas', false)}><Icon name="restore" /></button>
+        <button class="icon-btn" title="Apagar para sempre" disabled={!selected.size} onclick={bulkDeleteForever}>
+          <Icon name="trash" />
+        </button>
+      {:else}
+        <button
+          class="icon-btn"
+          title={allPinned ? 'Desafixar' : 'Fixar'}
+          class:active={allPinned}
+          disabled={!selected.size}
+          onclick={() => bulk(() => ({ pinned: !allPinned }), allPinned ? '{n} notas desafixadas' : '{n} notas fixadas')}>
+          <Icon name="pin" />
+        </button>
+        <Popover bind:open={selectColorOpen}>
+          {#snippet trigger(toggle)}
+            <button class="icon-btn" title="Cor" disabled={!selected.size} onclick={toggle}><Icon name="palette" /></button>
+          {/snippet}
+          {#snippet children()}
+            <div class="picker"><ColorPicker value={null} onpick={bulkColor} /></div>
+          {/snippet}
+        </Popover>
+        <button
+          class="icon-btn"
+          title={view === 'archive' ? 'Desarquivar' : 'Arquivar'}
+          disabled={!selected.size}
+          onclick={() =>
+            bulk(
+              () => ({ archived: view !== 'archive' }),
+              view === 'archive' ? '{n} notas desarquivadas' : '{n} notas arquivadas',
+            )}>
+          <Icon name={view === 'archive' ? 'unarchive' : 'archive'} />
+        </button>
+        <button
+          class="icon-btn"
+          title="Mover para o lixo"
+          disabled={!selected.size}
+          onclick={() => bulk(() => ({ deleted_at: now() }), '{n} notas movidas para o lixo')}>
+          <Icon name="trash" />
+        </button>
+      {/if}
+    </header>
+  {:else}
   <header class="top">
     {#if view === 'notes'}
       <img class="logo" src="/favicon.svg" alt="" width="30" height="30" />
@@ -269,14 +421,29 @@
           </button>
         {/each}
         <hr />
+        <button class="item" onclick={() => (close(), startSelect())}><Icon name="select" /> Selecionar notas</button>
+        <hr />
         <button class="item" onclick={() => (close(), exportBackup())}><Icon name="download" /> Exportar backup</button>
         <button class="item" onclick={() => (close(), importEl?.click())}><Icon name="upload" /> Importar backup</button>
+        <button class="item" onclick={() => (close(), (colorNoteOpen = true))}>
+          <Icon name="colornote" /> Importar do ColorNote
+        </button>
         <hr />
         <button class="item" onclick={() => (close(), logout())}><Icon name="logout" /> Terminar sessão</button>
+        <div class="version">Anotado v{__APP_VERSION__}</div>
       {/snippet}
     </Popover>
     <input type="file" accept="application/json,.json" hidden bind:this={importEl} onchange={importBackup} />
   </header>
+  {/if}
+
+  {#if pwa.needRefresh}
+    <div class="update-bar" role="status">
+      <Icon name="update" size={18} />
+      <span>Há uma nova versão do Anotado.</span>
+      <button onclick={() => pwa.update()}>Atualizar</button>
+    </div>
+  {/if}
 
   <div class="toolbar">
     <div class="filters" role="group" aria-label="Filtrar por cor">
@@ -340,19 +507,33 @@
       <h2>Fixadas</h2>
       <div class="notes {layout}">
         {#each pinned as note (note.id)}
-          <NoteCard {note} compact={layout === 'list'} onopen={() => openNote(note.id)} />
+          <NoteCard
+            {note}
+            {query}
+            compact={layout === 'list'}
+            selecting={selectMode}
+            selected={selected.has(note.id)}
+            onopen={() => openNote(note.id)}
+            onselect={() => toggleSelect(note.id)} />
         {/each}
       </div>
       {#if others.length}<h2>Outras</h2>{/if}
     {/if}
     <div class="notes {layout}">
       {#each others as note (note.id)}
-        <NoteCard {note} compact={layout === 'list'} onopen={() => openNote(note.id)} />
+        <NoteCard
+            {note}
+            {query}
+            compact={layout === 'list'}
+            selecting={selectMode}
+            selected={selected.has(note.id)}
+            onopen={() => openNote(note.id)}
+            onselect={() => toggleSelect(note.id)} />
       {/each}
     </div>
   </main>
 
-  {#if view !== 'trash'}
+  {#if view !== 'trash' && !selectMode}
     <div class="fab">
       <Popover bind:open={fabOpen} up>
         {#snippet trigger(toggle)}
@@ -372,8 +553,18 @@
 
   {#if editing}
     {#key editing.id}
-      <Editor bind:this={editor} id={editing.id} draft={editing.draft} onclose={closeEditor} {notify} />
+      <Editor
+        bind:this={editor}
+        id={editing.id}
+        draft={editing.draft}
+        onclose={closeEditor}
+        onopen={switchNote}
+        {notify} />
     {/key}
+  {/if}
+
+  {#if colorNoteOpen}
+    <ColorNoteImport onclose={() => (colorNoteOpen = false)} {notify} />
   {/if}
 
   {#if toast}
@@ -427,6 +618,7 @@
 
   .search {
     flex: 1;
+    min-width: 0;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -469,6 +661,66 @@
     animation: spin 1.2s linear infinite;
   }
 
+  .selectbar {
+    gap: 0;
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+
+  @media (max-width: 380px) {
+    .selectbar :global(.icon-btn) {
+      width: 36px;
+    }
+  }
+
+  .selectbar h1 {
+    flex: 1;
+    min-width: 0;
+    font-size: 1.05rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .picker {
+    padding: 8px;
+  }
+
+  .icon-btn:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+
+  .version {
+    padding: 8px 12px 4px;
+    font-size: 0.75rem;
+    color: var(--text-2);
+  }
+
+  .update-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: min(760px, calc(100% - 32px));
+    margin: 4px auto 6px;
+    padding: 8px 10px 8px 14px;
+    border-radius: 12px;
+    background: var(--surface);
+    border: 1px solid var(--accent);
+    font-size: 0.92rem;
+  }
+
+  .update-bar span {
+    flex: 1;
+  }
+
+  .update-bar button {
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: var(--accent);
+    color: var(--accent-text);
+    font-weight: 600;
+  }
+
   .count {
     margin-left: auto;
     font-size: 0.8rem;
@@ -486,6 +738,7 @@
 
   .filters {
     flex: 1;
+    min-width: 0;
     display: flex;
     gap: 8px;
     overflow-x: auto;

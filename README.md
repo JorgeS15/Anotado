@@ -9,7 +9,13 @@ Notas simples e coloridas, ao estilo do ColorNote, para usar no PC e no telemóv
 - Guarda automaticamente
 - **Funciona offline**: as notas ficam guardadas no dispositivo e as alterações são enviadas quando a ligação voltar
 - Sincronização em tempo real entre dispositivos
-- Modo claro e escuro, exportar e importar backup (JSON)
+- **Nada se perde**: se a mesma nota for editada em dois dispositivos ao mesmo tempo, a versão que perde fica guardada como "(conflito)"
+- **Histórico** de cada nota, com restauro de versões anteriores
+- **Backups diários automáticos** no servidor, além de exportar e importar backup (JSON)
+- **Importar do ColorNote** (backup `.doc`/`.dat`)
+- Seleção múltipla (toque longo ou **Menu → Selecionar notas**) para mudar cor, fixar, arquivar ou apagar várias notas de uma vez
+- Partilhar e duplicar notas; partilhar de outras apps **para** o Anotado (Android)
+- Modo claro e escuro
 - Um só utilizador, protegido por password
 
 ## Instalação (Docker)
@@ -45,10 +51,23 @@ docker compose up -d
 | `ANOTADO_PASSWORD` | sim         | Password de acesso. Mudá-la termina a sessão em todos os dispositivos.       |
 | `PORT`             | não         | Porta HTTP (por omissão `4008`).                                             |
 | `SESSION_SECRET`   | não         | Segredo das sessões. Se não for definido, é gerado e guardado na base de dados. |
+| `BACKUP_KEEP`      | não         | Quantos backups diários guardar (por omissão `30`; `0` desliga).             |
 | `TZ`               | não         | Fuso horário.                                                                |
 
-Os dados ficam em `/data/anotado.db` (SQLite). Para fazer backup, basta copiar a pasta `data`,
-ou usar **Menu → Exportar backup** na app.
+Os dados ficam em `/data/anotado.db` (SQLite). Todos os dias é escrito um backup em
+`/data/backups/anotado-AAAA-MM-DD.json` (os últimos 30 são mantidos), que pode ser importado em
+**Menu → Importar backup**. Também podes copiar a pasta `data` ou usar **Menu → Exportar backup**.
+
+### Versões da imagem
+
+| Tag                    | Quando é atualizada                              |
+| ---------------------- | ------------------------------------------------ |
+| `latest`               | A cada merge para `main`                         |
+| `1.1.0`, `1.1`, `1`    | Ao criar uma release/tag `v1.1.0` no GitHub      |
+| `sha-xxxxxxx`          | Cada commit                                      |
+
+Para fixar uma versão, usa por exemplo `ghcr.io/jorges15/anotado:1.1`. As alterações de cada versão
+estão no [CHANGELOG](CHANGELOG.md).
 
 ### Caddy
 
@@ -67,6 +86,25 @@ Não exponhas a porta 4008 diretamente à internet; usa sempre o Caddy à frente
 Abre o endereço no Chrome (Android), entra com a password e escolhe
 **⋮ → Adicionar ao ecrã principal / Instalar app**. No iPhone: Safari → Partilhar → **Adicionar ao ecrã principal**.
 
+Com a app instalada no Android:
+
+- O Anotado aparece no menu **Partilhar** das outras apps: texto e links partilhados viram uma nota nova.
+- Um toque longo no ícone mostra os atalhos **Nova nota** e **Nova checklist**.
+- A app pede ao sistema para não apagar as notas guardadas no telemóvel, mesmo com pouco espaço.
+- Quando há uma versão nova, aparece um aviso com o botão **Atualizar**.
+
+## Importar do ColorNote
+
+1. No ColorNote, faz um backup (**Definições → Backup**). O ficheiro fica em `data/colornote/backup`
+   (normalmente `.doc` ou `.dat`).
+2. No Anotado: **Menu → Importar do ColorNote**, escolhe o ficheiro e a password do backup
+   (por omissão `0000`).
+3. Escolhe a cor do Anotado para cada cor do ColorNote (há exemplos de notas para ajudar) e importa.
+
+As checklists, notas arquivadas e datas são mantidas. Importar o mesmo backup outra vez atualiza
+as notas em vez de as duplicar. O formato do ColorNote não é público: se o teu backup não for
+reconhecido, abre uma issue.
+
 ## Atalhos de teclado (PC)
 
 | Tecla | Ação                    |
@@ -77,6 +115,7 @@ Abre o endereço no Chrome (Android), entra com a password e escolhe
 | `Esc` | Fechar a nota / limpar a pesquisa |
 
 Nas checklists, `Enter` cria um novo item e `Backspace` num item vazio apaga-o.
+`Ctrl`+clique numa nota seleciona-a; `Esc` cancela a seleção.
 
 ## Desenvolvimento
 
@@ -95,7 +134,26 @@ Estrutura:
 ```
 server/   API (Hono + SQLite nativo do Node), autenticação, eventos em tempo real; serve o frontend
 web/      Frontend (Svelte 5 + Vite + PWA), guarda as notas em IndexedDB para uso offline
+e2e/      Testes end-to-end (Playwright)
 ```
 
 Sincronização: cada alteração é guardada primeiro no dispositivo e posta numa fila, que é enviada
-para o servidor quando há ligação. Em caso de conflito, ganha a edição mais recente.
+para o servidor quando há ligação. Cada dispositivo envia a versão em que se baseou; se outro
+dispositivo alterou a nota entretanto, ganha a edição mais recente e a outra fica como "(conflito)".
+As horas são corrigidas pelo relógio do servidor, para um telemóvel com a hora errada não estragar isto.
+
+### Testes
+
+```sh
+cd server && npm test                 # testes do servidor (node:test)
+cd web && npm run check && npm run build
+cd e2e && npm install && npx playwright install chromium && npx playwright test
+```
+
+O CI corre tudo isto em cada PR, antes de construir a imagem. O Dependabot abre PRs semanais
+com atualizações de dependências.
+
+### Lançar uma versão
+
+1. Atualiza a versão em `server/package.json`, `web/package.json` e `e2e/package.json`, e o `CHANGELOG.md`.
+2. Depois do merge, cria uma release no GitHub com a tag `vX.Y.Z`. A imagem com essa versão é publicada automaticamente.

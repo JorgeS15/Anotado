@@ -33,6 +33,31 @@ export interface Note {
   deleted_at: number | null;
   created_at: number;
   updated_at: number;
+  /** Local only: the server `updated_at` this device last saw for the note. */
+  synced?: number;
+}
+
+export interface NoteVersion {
+  id: number;
+  saved_at: number;
+  note: Note;
+}
+
+export interface ColorNoteRecord {
+  source_id: string;
+  title: string;
+  type: NoteType;
+  content: string;
+  items: ChecklistItem[];
+  color_index: number;
+  archived: boolean;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface ColorNotePreview {
+  records: ColorNoteRecord[];
+  colors: { index: number; count: number; samples: string[]; suggested: Color }[];
 }
 
 export type View = 'notes' | 'archive' | 'trash';

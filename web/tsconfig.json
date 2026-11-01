@@ -9,5 +9,5 @@
     "skipLibCheck": true,
     "types": ["vite/client", "vite-plugin-pwa/client"]
   },
-  "include": ["src/**/*.ts", "src/**/*.svelte"]
+  "include": ["src/**/*.ts", "src/**/*.svelte", "src/env.d.ts"]
 }
