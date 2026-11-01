@@ -422,6 +422,9 @@
         {/each}
         <hr />
         <button class="item" onclick={() => (close(), startSelect())}><Icon name="select" /> Selecionar notas</button>
+        {#if pwa.canInstall}
+          <button class="item" onclick={() => (close(), pwa.install())}><Icon name="download" /> Instalar app</button>
+        {/if}
         <hr />
         <button class="item" onclick={() => (close(), exportBackup())}><Icon name="download" /> Exportar backup</button>
         <button class="item" onclick={() => (close(), importEl?.click())}><Icon name="upload" /> Importar backup</button>

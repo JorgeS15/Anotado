@@ -63,7 +63,7 @@ Os dados ficam em `/data/anotado.db` (SQLite). Todos os dias é escrito um backu
 | Tag                    | Quando é atualizada                              |
 | ---------------------- | ------------------------------------------------ |
 | `latest`               | A cada merge para `main`                         |
-| `1.1.0`, `1.1`, `1`    | Ao criar uma release/tag `v1.1.0` no GitHub      |
+| `1.1.0`, `1.1`, `1`    | Quando uma versão nova chega ao `main` (release automática) |
 | `sha-xxxxxxx`          | Cada commit                                      |
 
 Para fixar uma versão, usa por exemplo `ghcr.io/jorges15/anotado:1.1`. As alterações de cada versão
@@ -83,8 +83,13 @@ Não exponhas a porta 4008 diretamente à internet; usa sempre o Caddy à frente
 
 ### Instalar no telemóvel
 
-Abre o endereço no Chrome (Android), entra com a password e escolhe
-**⋮ → Adicionar ao ecrã principal / Instalar app**. No iPhone: Safari → Partilhar → **Adicionar ao ecrã principal**.
+Abre o endereço no **Chrome** (Android), entra com a password e escolhe **Menu do Anotado → Instalar app**
+(ou **⋮ → Instalar app** no Chrome). A app passa a aparecer na lista de apps e na pesquisa do telemóvel.
+
+> Se escolheres "Adicionar ao ecrã principal → Criar atalho", fica só um atalho (com o símbolo do Chrome no ícone)
+> que não aparece na lista de apps. Nesse caso apaga-o e instala de novo como acima.
+
+No iPhone: Safari → Partilhar → **Adicionar ao ecrã principal**.
 
 Com a app instalada no Android:
 
@@ -155,5 +160,9 @@ com atualizações de dependências.
 
 ### Lançar uma versão
 
-1. Atualiza a versão em `server/package.json`, `web/package.json` e `e2e/package.json`, e o `CHANGELOG.md`.
-2. Depois do merge, cria uma release no GitHub com a tag `vX.Y.Z`. A imagem com essa versão é publicada automaticamente.
+1. Num PR, atualiza a versão em `server/package.json`, `web/package.json` e `e2e/package.json`
+   (têm de ser iguais) e acrescenta a secção `## [X.Y.Z]` ao `CHANGELOG.md`.
+2. Faz merge. O CI publica as imagens `X.Y.Z`, `X.Y` e `X`, cria a tag `vX.Y.Z` e a release no GitHub
+   com as notas dessa secção do CHANGELOG. Não é preciso fazer mais nada.
+
+Merges sem mudança de versão só atualizam a imagem `latest`.

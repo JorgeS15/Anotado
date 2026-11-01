@@ -3,6 +3,14 @@
 Todas as alterações relevantes do Anotado. O formato segue [Keep a Changelog](https://keepachangelog.com/pt-PT/1.1.0/)
 e as versões seguem [Semantic Versioning](https://semver.org/lang/pt-PT/).
 
+## [1.1.1] - 2026-11-01
+
+### Added
+- Botão "Instalar app" no menu, para instalar o Anotado como app (aparece na lista de apps e na pesquisa do telemóvel) em vez de criar só um atalho.
+
+### Changed
+- O CI cria a tag `vX.Y.Z` e a release no GitHub sozinho quando uma versão nova chega ao `main`, e publica as imagens com essa versão.
+
 ## [1.1.0] - 2026-10-31
 
 ### Added

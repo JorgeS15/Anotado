@@ -19,6 +19,7 @@ export default defineConfig({
         short_name: 'Anotado',
         description: 'Notas simples, com cor.',
         lang: 'pt-PT',
+        id: '/',
         start_url: '/',
         scope: '/',
         display: 'standalone',
@@ -28,6 +29,7 @@ export default defineConfig({
         share_target: {
           action: '/share',
           method: 'GET',
+          enctype: 'application/x-www-form-urlencoded',
           params: { title: 'title', text: 'text', url: 'url' },
         },
         shortcuts: [

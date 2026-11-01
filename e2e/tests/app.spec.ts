@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { card, colorNoteBackup, createTextNote, login, newDevice } from './helpers';
+import { card, colorNoteBackup, createTextNote, localNoteContents, login, newDevice } from './helpers';
 
 /** Titles unique per project, since desktop and mobile share one server. */
 const u = (title: string) => `${title} ${test.info().project.name}`;
@@ -47,6 +47,8 @@ test('offline edits are kept and sent when back online', async ({ page, context,
   await page.fill('.editor .content', 'editado sem rede');
   await page.keyboard.press('Escape');
   await expect(page.locator('.status')).toBeVisible();
+  // Only reload once the edit is stored on the device, as a real app restart would find it.
+  await expect.poll(() => localNoteContents(page)).toContain('editado sem rede');
 
   // The app still opens without a connection, with the local copy.
   await page.reload();
