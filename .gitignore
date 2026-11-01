@@ -5,3 +5,4 @@ data/
 *.log
 test-results/
 playwright-report/
+notes.md
