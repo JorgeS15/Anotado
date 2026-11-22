@@ -8,8 +8,8 @@ updates:
       minor-and-patch:
         update-types: [minor, patch]
     ignore:
-      # Kept in step with the Playwright browsers; update deliberately.
-      - dependency-name: '@playwright/test'
+      # Major versions can break things: update those deliberately, in their own PR.
+      - dependency-name: '*'
         update-types: [version-update:semver-major]
   - package-ecosystem: github-actions
     directory: /
@@ -22,3 +22,6 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    ignore:
+      - dependency-name: node
+        update-types: [version-update:semver-major]
