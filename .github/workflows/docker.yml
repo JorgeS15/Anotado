@@ -63,7 +63,9 @@ jobs:
 
   e2e:
     needs: check
-    runs-on: ubuntu-latest
+    # Pinned: Playwright only installs browsers on Ubuntu versions it supports, and
+    # ubuntu-latest moved to 26.04 before @playwright/test did. Bump together.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
