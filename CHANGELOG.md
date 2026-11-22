@@ -3,6 +3,15 @@
 Todas as alterações relevantes do Anotado. O formato segue [Keep a Changelog](https://keepachangelog.com/pt-PT/1.1.0/)
 e as versões seguem [Semantic Versioning](https://semver.org/lang/pt-PT/).
 
+## [1.1.2] - 2026-11-22
+
+### Security
+- Atualizados `hono` (4.13.20) e `@hono/node-server` (2.1.11), que corrigem vulnerabilidades conhecidas, incluindo uma em que certos caminhos podiam saltar middleware como o da autenticação.
+- O servidor recusa-se a arrancar se `ANOTADO_PASSWORD` for a password de exemplo do `docker-compose.yml`, e avisa se tiver menos de 8 caracteres.
+
+### Changed
+- O Dependabot só propõe atualizações menores e correções; as versões principais ficam para atualizar à mão.
+
 ## [1.1.1] - 2026-11-01
 
 ### Added

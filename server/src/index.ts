@@ -15,9 +15,19 @@ const password = process.env.ANOTADO_PASSWORD ?? '';
 const backupKeep = Number(process.env.BACKUP_KEEP ?? 30);
 const { version } = JSON.parse(readFileSync(resolve(import.meta.dirname, '../package.json'), 'utf8'));
 
+// The example value from docker-compose.yml / README must never protect a real server.
+const EXAMPLE_PASSWORD = 'muda-esta-password';
+
 if (!password) {
   console.error('ANOTADO_PASSWORD is not set. Define it to choose the login password.');
   process.exit(1);
+}
+if (password === EXAMPLE_PASSWORD) {
+  console.error('ANOTADO_PASSWORD is still the example value. Choose your own password.');
+  process.exit(1);
+}
+if (password.length < 8) {
+  console.warn('ANOTADO_PASSWORD is shorter than 8 characters. Consider a longer password.');
 }
 
 const store = new Store(resolve(dataDir, 'anotado.db'));
