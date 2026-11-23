@@ -18,6 +18,8 @@ Notas simples e coloridas, ao estilo do ColorNote, para usar no PC e no telemóv
 - Modo claro e escuro
 - Um só utilizador, protegido por password
 
+O que vem a seguir está no [ROADMAP](ROADMAP.md).
+
 ## Instalação (Docker)
 
 A imagem é publicada automaticamente em `ghcr.io/jorges15/anotado` a cada merge para `main`,
