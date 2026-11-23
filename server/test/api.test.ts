@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createApp } from '../src/app.ts';
+import { SESSION_COOKIE, Sessions } from '../src/auth.ts';
 import { encryptForTest } from '../src/colornote.ts';
 import { Store } from '../src/db.ts';
 import { makeNote } from './helpers.ts';
@@ -101,4 +102,28 @@ test('imports a ColorNote backup with a colour mapping', async () => {
 
   const bad = await call('/api/colornote/preview', { method: 'POST', body: backup, headers: { 'x-backup-password': 'x' } });
   assert.equal(bad.status, 400);
+});
+
+test('an active session older than a day is renewed', async () => {
+  const { app } = createApp({ store: new Store(':memory:'), password: 'pw', secret: 'secret' });
+  const sessions = new Sessions('secret', 'pw');
+  const day = 24 * 60 * 60 * 1000;
+
+  const fresh = await app.request('/api/session', { headers: { cookie: `${SESSION_COOKIE}=${sessions.create()}` } });
+  assert.equal((await fresh.json()).authenticated, true);
+  assert.equal(fresh.headers.get('set-cookie'), null);
+
+  const old = await app.request('/api/session', {
+    headers: { cookie: `${SESSION_COOKIE}=${sessions.create(Date.now() - 2 * day)}` },
+  });
+  assert.equal((await old.json()).authenticated, true);
+  const renewed = old.headers.get('set-cookie')!.split(';')[0].split('=')[1];
+  assert.ok(sessions.verify(renewed));
+  assert.ok(Number(renewed.split('.')[0]) > Date.now() - 60_000);
+
+  const expired = await app.request('/api/session', {
+    headers: { cookie: `${SESSION_COOKIE}=${sessions.create(Date.now() - 401 * day)}` },
+  });
+  assert.equal((await expired.json()).authenticated, false);
+  assert.equal(expired.headers.get('set-cookie'), null);
 });

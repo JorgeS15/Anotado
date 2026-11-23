@@ -3,6 +3,16 @@
 Todas as alterações relevantes do Anotado. O formato segue [Keep a Changelog](https://keepachangelog.com/pt-PT/1.1.0/)
 e as versões seguem [Semantic Versioning](https://semver.org/lang/pt-PT/).
 
+## [1.1.3] - 2026-11-23
+
+### Fixed
+- Uma alteração recusada pelo servidor (por exemplo, uma nota demasiado grande) já não se perde: fica guardada no dispositivo, a nota mostra "Não sincronizada" com o motivo, e é enviada outra vez quando for corrigida. Antes era descartada sem aviso e substituída pela versão do servidor na sincronização seguinte.
+
+### Added
+- O editor mostra o número de caracteres quando a nota se aproxima do limite (200 000), e não deixa ultrapassar os limites do título, dos itens e do número de itens das checklists.
+- A sessão é renovada sempre que a app abre (depois de um dia), por isso um dispositivo em uso nunca chega a expirar.
+- Mensagens de erro mais claras na importação do ColorNote: password errada, ficheiro que não é um backup, ou backup aberto mas com um formato ainda não suportado.
+
 ## [1.1.2] - 2026-11-22
 
 ### Security

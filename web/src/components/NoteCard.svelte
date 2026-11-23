@@ -10,6 +10,7 @@
     query = '',
     selecting = false,
     selected = false,
+    warning = '',
     onopen,
     onselect,
   }: {
@@ -18,6 +19,7 @@
     query?: string;
     selecting?: boolean;
     selected?: boolean;
+    warning?: string;
     onopen: () => void;
     onselect: () => void;
   } = $props();
@@ -131,7 +133,10 @@
     <p class="text empty">Nota vazia</p>
   {/if}
 
-  <span class="date">{formatShort(note.updated_at)}</span>
+  <span class="date">
+    {#if warning}<span class="warn" title={warning}><Icon name="warning" size={14} /> Não sincronizada</span>{/if}
+    {formatShort(note.updated_at)}
+  </span>
 </button>
 
 <style>
@@ -269,8 +274,21 @@
     opacity: 0.6;
   }
 
+  .warn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-right: 6px;
+    color: var(--danger);
+    font-weight: 600;
+  }
+
   .date {
     margin-top: auto;
     padding-top: 2px;
+  }
+
+  .date:has(.warn) {
+    opacity: 1;
   }
 </style>

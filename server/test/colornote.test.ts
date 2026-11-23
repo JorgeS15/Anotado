@@ -52,7 +52,16 @@ test('accepts an already decrypted JSON export', () => {
 });
 
 test('wrong password is reported clearly', () => {
-  assert.throws(() => parseColorNote(encryptForTest(framed()), '1234'), ColorNoteError);
+  assert.throws(() => parseColorNote(encryptForTest(framed()), '1234'), /desencriptar.*password/);
+});
+
+test('a file that is not a backup says so', () => {
+  assert.throws(() => parseColorNote(Buffer.from('isto não é um backup')), /não parece ser um backup/);
+});
+
+test('a readable backup without notes asks for an issue', () => {
+  const plain = Buffer.from(JSON.stringify([{ _id: 1, setting: 'x' }, { _id: 2, theme: 'dark' }]));
+  assert.throws(() => parseColorNote(encryptForTest(plain)), /nenhum dos 2 registos/);
 });
 
 test('colour mapping and ids', () => {

@@ -158,11 +158,14 @@ export function parseColorNote(data: Buffer, password = '0000'): ColorNoteRecord
   const candidates: Buffer[] = [];
   const asText = data.toString('utf8');
   if (/^\s*[[{]/.test(asText)) candidates.push(data);
+  const blockAligned = OFFSETS.some((o) => data.length > o && (data.length - o) % 16 === 0);
   for (const offset of OFFSETS) {
     const plain = decrypt(data, password, offset);
     if (plain) candidates.push(plain);
   }
 
+  // Most records found in a readable candidate, to explain a failure below.
+  let unrecognised = 0;
   for (const plain of candidates) {
     const raws = scanJsonObjects(plain.toString('utf8'));
     // Keep the newest copy of each note.
@@ -174,9 +177,21 @@ export function parseColorNote(data: Buffer, password = '0000'): ColorNoteRecord
       if (!previous || previous.updated_at <= record.updated_at) byId.set(record.source_id, record);
     });
     if (byId.size) return [...byId.values()];
+    unrecognised = Math.max(unrecognised, raws.length);
+  }
+
+  if (unrecognised > 0) {
+    throw new ColorNoteError(
+      `Consegui abrir o backup, mas nenhum dos ${unrecognised} registos parece uma nota. ` +
+        'Este formato ainda não é suportado: abre uma issue no GitHub do Anotado.',
+    );
+  }
+  if (!candidates.length && !blockAligned) {
+    throw new ColorNoteError('O ficheiro não parece ser um backup do ColorNote (tamanho inesperado).');
   }
   throw new ColorNoteError(
-    'Não foi possível ler o backup. Confirma a password (por omissão é 0000) e que o ficheiro é um backup do ColorNote.',
+    'Não foi possível desencriptar o backup. Confirma a password (por omissão é 0000, ' +
+      'a não ser que tenhas definido outra no ColorNote).',
   );
 }
 

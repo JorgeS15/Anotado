@@ -203,3 +203,51 @@ test('menu shows the app version', async ({ page }) => {
   await page.click('[aria-label="Menu"]');
   await expect(page.locator('.panel .version')).toHaveText(/^Anotado v\d+\.\d+\.\d+$/);
 });
+
+test('an edit the server refuses is kept and synced once fixed', async ({ page, browser }) => {
+  await login(page);
+  await createTextNote(page, 'Recusada', 'original');
+  const pc = await newDevice(browser);
+  await expect(card(pc.page, 'Recusada')).toBeVisible();
+
+  // The server refuses this note's next save (as it would for one that is too large).
+  await page.route('**/api/notes/*', (route) =>
+    route.request().method() === 'PUT'
+      ? route.fulfill({ status: 400, contentType: 'application/json', body: '{"error":"content is too long"}' })
+      : route.continue(),
+  );
+  await card(page, 'Recusada').click();
+  await page.fill('.editor .content', 'edição recusada');
+  await expect(page.locator('.editor .banner.warning')).toContainText('demasiado grande');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.toast')).toContainText('não foi sincronizada');
+  await expect(card(page, 'Recusada')).toContainText('Não sincronizada');
+
+  // A full sync must not overwrite the local edit with the server's version.
+  await page.reload();
+  await expect(card(page, 'Recusada')).toContainText('edição recusada');
+  await expect(card(page, 'Recusada')).toContainText('Não sincronizada');
+
+  // Once the server accepts it again, the next edit syncs and the warning goes away.
+  await page.unroute('**/api/notes/*');
+  await card(page, 'Recusada').click();
+  await page.fill('.editor .content', 'edição corrigida');
+  await expect(page.locator('.editor .banner.warning')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(card(pc.page, 'Recusada')).toContainText('edição corrigida');
+  await expect(card(page, 'Recusada')).not.toContainText('Não sincronizada');
+  await pc.context.close();
+});
+
+test('the editor shows the size limit when a note gets close to it', async ({ page }) => {
+  await login(page);
+  await page.click('.fab-btn');
+  await page.click('.fab >> text=Texto');
+  await expect(page.locator('.editor .content')).toHaveAttribute('maxlength', '200000');
+  await expect(page.locator('.editor .limit')).toHaveCount(0);
+  await page.fill('.editor .title', 'Longa');
+  await page.fill('.editor .content', 'a'.repeat(190_000));
+  await expect(page.locator('.editor .limit')).toContainText('190 000 / 200 000');
+  await page.fill('.editor .content', 'a'.repeat(200_000));
+  await expect(page.locator('.editor .limit')).toContainText('limite atingido');
+});

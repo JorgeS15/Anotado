@@ -69,6 +69,8 @@ class NoteStore {
   online = $state(true);
   pending = $state(0);
   loaded = $state(false);
+  /** Notes the server refused (e.g. too large), by id. Kept locally and retried until fixed. */
+  rejected = $state<Record<string, string>>({});
 
   /** Bumped on every outbox write, so a finished request knows if it is stale. */
   private versions = new Map<string, number>();
@@ -149,6 +151,7 @@ class NoteStore {
       () => {},
     );
     this.notes = {};
+    this.rejected = {};
     this.outboxIds.clear();
     this.pending = 0;
     this.setAuth(false);
@@ -185,6 +188,7 @@ class NoteStore {
   /** Permanently deletes a note on every device. */
   purge(id: string) {
     this.dirty.delete(id);
+    delete this.rejected[id];
     delete this.notes[id];
     del(id, notesDb).catch(() => {});
     this.queue({ kind: 'delete', id });
@@ -249,6 +253,7 @@ class NoteStore {
         const outbox = await entries<string, OutboxEntry>(outboxDb).catch(() => []);
         for (const [id, entry] of outbox) {
           const version = this.versions.get(id) ?? 0;
+          let keep = false;
           try {
             if (entry.kind === 'put') {
               // Send the latest known server version, which may be newer than when the edit was queued.
@@ -258,6 +263,7 @@ class NoteStore {
                 { method: 'PUT', body: JSON.stringify({ ...entry.note, synced }) },
               );
               if (res.conflict) this.applyRemote(res.conflict, true);
+              delete this.rejected[id];
               if (res.applied) {
                 this.markSynced(id, res.note.updated_at);
               } else if ((this.versions.get(id) ?? 0) === version && !this.dirty.has(id)) {
@@ -274,14 +280,23 @@ class NoteStore {
               return;
             }
             if (err instanceof HttpError && err.status >= 400 && err.status < 500) {
-              console.warn('Alteração rejeitada pelo servidor; descartada.', entry, err);
+              if (entry.kind === 'put') {
+                // Never drop the edit: keep it on the device and in the outbox, and tell the user.
+                // A later edit replaces this entry and is sent again.
+                this.rejected[id] = /too long|too many/.test(err.message)
+                  ? 'A nota é demasiado grande para guardar no servidor. Encurta-a para voltar a sincronizar.'
+                  : `O servidor recusou esta nota (${err.message}). Fica guardada só neste dispositivo.`;
+                keep = true;
+              } else {
+                console.warn('Apagar recusado pelo servidor; ignorado.', entry, err);
+              }
             } else {
               this.online = false;
               this.startRetry();
               return;
             }
           }
-          if ((this.versions.get(id) ?? 0) === version) {
+          if (!keep && (this.versions.get(id) ?? 0) === version) {
             this.outboxIds.delete(id);
             await del(id, outboxDb).catch(() => {});
           }
