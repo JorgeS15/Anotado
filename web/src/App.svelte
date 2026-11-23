@@ -192,6 +192,16 @@
     view = e.state?.view ?? 'notes';
   }
 
+  // --- Sync problems ------------------------------------------------------------
+
+  const rejectedCount = $derived(Object.keys(store.rejected).length);
+  let rejectedSeen = 0;
+  $effect(() => {
+    // Say it once when a note starts being refused; the editor and the card explain why.
+    if (rejectedCount > rejectedSeen) notify('Uma nota não foi sincronizada: abre-a para ver porquê.');
+    rejectedSeen = rejectedCount;
+  });
+
   // --- Selection ---------------------------------------------------------------
 
   function toggleSelect(id: string) {
@@ -394,6 +404,10 @@
         <Icon name="cloudOff" size={20} />
         {#if store.pending}<small>{store.pending}</small>{/if}
       </span>
+    {:else if rejectedCount}
+      <span class="status warn" title="{rejectedCount} {rejectedCount === 1 ? 'nota não sincronizada' : 'notas não sincronizadas'}: abre-as para ver porquê.">
+        <Icon name="warning" size={20} /><small>{rejectedCount}</small>
+      </span>
     {:else if store.pending}
       <span class="status syncing" title="A sincronizar…"><Icon name="sync" size={18} /></span>
     {/if}
@@ -517,6 +531,7 @@
             selecting={selectMode}
             selected={selected.has(note.id)}
             onopen={() => openNote(note.id)}
+            warning={store.rejected[note.id]}
             onselect={() => toggleSelect(note.id)} />
         {/each}
       </div>
@@ -531,6 +546,7 @@
             selecting={selectMode}
             selected={selected.has(note.id)}
             onopen={() => openNote(note.id)}
+            warning={store.rejected[note.id]}
             onselect={() => toggleSelect(note.id)} />
       {/each}
     </div>
@@ -653,6 +669,10 @@
     align-items: center;
     gap: 2px;
     color: var(--text-2);
+  }
+
+  .status.warn {
+    color: var(--danger);
   }
 
   .status small {

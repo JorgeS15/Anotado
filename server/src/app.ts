@@ -70,9 +70,22 @@ export function createApp({ store, password, secret, webDir, version = 'dev' }: 
 
   app.get('/api/health', (c) => c.json({ ok: true, version }));
 
-  app.get('/api/session', (c) =>
-    c.json({ authenticated: sessions.verify(getCookie(c, SESSION_COOKIE)), now: Date.now(), version }),
-  );
+  const issueSession = (c: Context) =>
+    setCookie(c, SESSION_COOKIE, sessions.create(), {
+      httpOnly: true,
+      secure: isHttps(c),
+      sameSite: 'Lax',
+      path: '/',
+      maxAge: SESSION_MAX_AGE,
+    });
+
+  // Called whenever the app opens: renews the session of devices that keep using it.
+  app.get('/api/session', (c) => {
+    const token = getCookie(c, SESSION_COOKIE);
+    const authenticated = sessions.verify(token);
+    if (sessions.needsRenewal(token)) issueSession(c);
+    return c.json({ authenticated, now: Date.now(), version });
+  });
 
   app.post('/api/login', async (c) => {
     const key = clientKey(c);
@@ -86,13 +99,7 @@ export function createApp({ store, password, secret, webDir, version = 'dev' }: 
       return c.json({ error: 'Password errada.' }, 401);
     }
     limiter.reset(key);
-    setCookie(c, SESSION_COOKIE, sessions.create(), {
-      httpOnly: true,
-      secure: isHttps(c),
-      sameSite: 'Lax',
-      path: '/',
-      maxAge: SESSION_MAX_AGE,
-    });
+    issueSession(c);
     return c.json({ ok: true });
   });
 

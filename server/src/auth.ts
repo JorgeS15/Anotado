@@ -35,6 +35,12 @@ export class Sessions {
     return `${now}.${this.sign(now)}`;
   }
 
+  /** A valid session older than a day gets a fresh cookie, so active devices never hit the expiry. */
+  needsRenewal(token: string | undefined, now = Date.now()): boolean {
+    if (!this.verify(token, now)) return false;
+    return now - Number(token!.split('.')[0]) > 24 * 60 * 60 * 1000;
+  }
+
   verify(token: string | undefined, now = Date.now()): boolean {
     if (!token) return false;
     const [issuedRaw, signature] = token.split('.');

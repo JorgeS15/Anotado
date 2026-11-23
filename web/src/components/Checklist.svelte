@@ -1,6 +1,7 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import { autogrow } from '../lib/autogrow';
+  import { LIMITS, formatCount } from '../lib/limits';
   import type { ChecklistItem } from '../lib/types';
   import { uid } from '../lib/util';
   import Icon from './Icon.svelte';
@@ -16,6 +17,7 @@
 
   const open = $derived(items.filter((i) => !i.done));
   const done = $derived(items.filter((i) => i.done));
+  const full = $derived(items.length >= LIMITS.items);
 
   async function focusItem(id: string, atEnd = true) {
     await tick();
@@ -26,6 +28,7 @@
   }
 
   function add(afterId?: string, text = '') {
+    if (items.length >= LIMITS.items) return;
     const item: ChecklistItem = { id: uid(), text, done: false };
     const index = afterId ? items.findIndex((i) => i.id === afterId) + 1 : lastOpenIndex() + 1;
     items.splice(index, 0, item);
@@ -50,6 +53,8 @@
     const el = e.currentTarget as HTMLTextAreaElement;
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
+      // At the item limit a split would drop the text after the cursor.
+      if (full) return;
       // Split the item at the cursor, like a text editor.
       const rest = el.value.slice(el.selectionEnd);
       item.text = el.value.slice(0, el.selectionStart);
@@ -135,6 +140,7 @@
     <textarea
       data-item={item.id}
       rows="1"
+      maxlength={LIMITS.itemText}
       bind:value={item.text}
       use:autogrow={item.text}
       {readonly}
@@ -157,9 +163,13 @@
   </ul>
 
   {#if !readonly}
-    <button class="add" type="button" onclick={() => add()}>
-      <Icon name="plus" size={20} /> Adicionar item
-    </button>
+    {#if full}
+      <p class="full">Limite de {formatCount(LIMITS.items)} itens atingido.</p>
+    {:else}
+      <button class="add" type="button" onclick={() => add()}>
+        <Icon name="plus" size={20} /> Adicionar item
+      </button>
+    {/if}
   {/if}
 
   {#if done.length}
@@ -253,6 +263,12 @@
     gap: 12px;
     padding: 8px 6px 8px 32px;
     opacity: 0.6;
+  }
+
+  .full {
+    margin: 8px 0 8px 32px;
+    font-size: 0.85rem;
+    color: var(--danger);
   }
 
   .done-label {

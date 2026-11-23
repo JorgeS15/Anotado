@@ -4,6 +4,7 @@
   import { now } from '../lib/clock';
   import { store } from '../lib/store.svelte';
   import type { Color, Note } from '../lib/types';
+  import { LIMITS, formatCount } from '../lib/limits';
   import { findLinks, formatFull, isEmpty, itemsToText, textToItems, uid } from '../lib/util';
   import Checklist from './Checklist.svelte';
   import History from './History.svelte';
@@ -31,6 +32,9 @@
   const note = $derived(store.notes[id] ?? local);
   const trashed = $derived(note?.deleted_at != null);
   const links = $derived(note?.type === 'text' ? findLinks(note.content) : []);
+  const rejected = $derived(store.rejected[id] ?? '');
+  // Show the size only when the note gets close to what the server accepts.
+  const nearLimit = $derived(note?.type === 'text' && note.content.length > LIMITS.content * 0.9);
 
   let contentEl = $state<HTMLTextAreaElement>();
   let colorOpen = $state(false);
@@ -236,9 +240,13 @@
         {#if trashed}
           <p class="banner">Esta nota está no lixo. Restaura-a para a editar.</p>
         {/if}
+        {#if rejected}
+          <p class="banner warning" role="alert"><Icon name="warning" size={18} /> {rejected}</p>
+        {/if}
         <input
           class="title"
           placeholder="Título"
+          maxlength={LIMITS.title}
           bind:value={note.title}
           oninput={changed}
           readonly={trashed}
@@ -253,6 +261,7 @@
           <textarea
             class="content"
             placeholder="Escreve aqui…"
+            maxlength={LIMITS.content}
             bind:this={contentEl}
             bind:value={note.content}
             use:autogrow={note.content}
@@ -271,6 +280,14 @@
       </div>
 
       <footer>
+        {#if nearLimit}
+          <span class="limit" class:full={note.content.length >= LIMITS.content}>
+            {formatCount(note.content.length)} / {formatCount(LIMITS.content)} caracteres{note.content.length >=
+            LIMITS.content
+              ? ' — limite atingido'
+              : ''}
+          </span><br />
+        {/if}
         Editada {formatFull(note.updated_at)} · Criada {formatFull(note.created_at)}
       </footer>
     </div>
@@ -355,6 +372,25 @@
     border-radius: 10px;
     background: color-mix(in srgb, currentColor 8%, transparent);
     font-size: 0.9rem;
+  }
+
+  .banner.warning {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    background: color-mix(in srgb, var(--danger) 15%, transparent);
+  }
+
+  .limit {
+    font-weight: 600;
+  }
+
+  footer:has(.limit) {
+    opacity: 0.85;
+  }
+
+  .limit.full {
+    color: var(--danger);
   }
 
   .title {
