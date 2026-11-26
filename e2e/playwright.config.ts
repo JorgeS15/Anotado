@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const PORT = 4018;
+export const API_TOKEN = 'e2e-token-0123456789abcdef0123';
 // One fresh database per run.
 const dataDir = process.env.E2E_DATA_DIR ?? mkdtempSync(join(tmpdir(), 'anotado-e2e-'));
 process.env.E2E_DATA_DIR = dataDir;
@@ -17,6 +18,8 @@ export default defineConfig({
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {
     baseURL: `http://localhost:${PORT}`,
+    // The interface follows the browser's language; most tests read the Portuguese texts.
+    locale: 'pt-PT',
     trace: 'retain-on-failure',
   },
   projects: [
@@ -33,6 +36,8 @@ export default defineConfig({
       DATA_DIR: dataDir,
       WEB_DIR: '../web/dist',
       BACKUP_KEEP: '30',
+      ANOTADO_API_TOKEN: API_TOKEN,
+      UPDATE_CHECK: 'false',
     },
   },
 });

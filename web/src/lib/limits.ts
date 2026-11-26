@@ -1,3 +1,4 @@
+import { locale } from './i18n';
 // Must match the server's validation in server/src/notes.ts.
 export const LIMITS = {
   title: 1_000,
@@ -6,5 +7,5 @@ export const LIMITS = {
   itemText: 10_000,
 } as const;
 
-const number = new Intl.NumberFormat('pt-PT');
+const number = new Intl.NumberFormat(locale);
 export const formatCount = (n: number) => number.format(n);

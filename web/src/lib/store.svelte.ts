@@ -1,6 +1,7 @@
+import { t, tn } from './i18n';
 import { createStore, del, delMany, entries, set, setMany, values } from 'idb-keyval';
 import { clientId, now, syncClock } from './clock';
-import type { ColorNotePreview, Note, NoteVersion } from './types';
+import { COLOR_LABELS, type Color, type ColorNotePreview, type Note, type NoteVersion, type ServerStatus, type Settings, type UpdateInfo } from './types';
 
 /**
  * Offline-first note store.
@@ -25,6 +26,8 @@ export class HttpError extends Error {
 const notesDb = createStore('anotado-notes', 'notes');
 const outboxDb = createStore('anotado-outbox', 'outbox');
 const AUTH_KEY = 'anotado:authed';
+const SETTINGS_KEY = 'anotado:settings';
+const SETTINGS_PENDING_KEY = 'anotado:settings-pending';
 const SAVE_DELAY = 300;
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
@@ -55,6 +58,40 @@ function rememberAuth(value: boolean) {
   }
 }
 
+function loadSettings(): Settings {
+  try {
+    const raw = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? 'null');
+    if (raw && typeof raw.color_names === 'object') {
+      return {
+        color_names: raw.color_names ?? {},
+        templates: Array.isArray(raw.templates) ? raw.templates : [],
+        order: Array.isArray(raw.order) ? raw.order : [],
+      };
+    }
+  } catch {
+    /* ignore */
+  }
+  return { color_names: {}, templates: [], order: [] };
+}
+
+function storeSettings(settings: Settings, pending: boolean) {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    if (pending) localStorage.setItem(SETTINGS_PENDING_KEY, '1');
+    else localStorage.removeItem(SETTINGS_PENDING_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+function settingsPending(): boolean {
+  try {
+    return localStorage.getItem(SETTINGS_PENDING_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
 function hadAuth(): boolean {
   try {
     return localStorage.getItem(AUTH_KEY) === '1';
@@ -71,6 +108,14 @@ class NoteStore {
   loaded = $state(false);
   /** Notes the server refused (e.g. too large), by id. Kept locally and retried until fixed. */
   rejected = $state<Record<string, string>>({});
+  /** Shared by every device: colour names. Edited offline too, and sent on the next sync. */
+  settings = $state<Settings>(loadSettings());
+  /** Days notes stay in the trash, as configured on the server. */
+  trashDays = $state(30);
+  /** A newer release the server knows about. */
+  newVersion = $state<UpdateInfo | null>(null);
+  /** Called when the server says a reminder is due, so an open app can show it. */
+  onreminder: ((id: string) => void) | undefined;
 
   /** Bumped on every outbox write, so a finished request knows if it is stale. */
   private versions = new Map<string, number>();
@@ -81,6 +126,10 @@ class NoteStore {
   private flushAgain = false;
   private events: EventSource | undefined;
   private retryTimer: ReturnType<typeof setInterval> | undefined;
+  /** When each note last changed from a live event, so an older full sync does not undo it. */
+  private liveSeq = 0;
+  private liveChanges = new Map<string, number>();
+  private pulls = 0;
 
   async init() {
     try {
@@ -112,8 +161,13 @@ class NoteStore {
   async checkSession() {
     try {
       const sentAt = Date.now();
-      const { authenticated, now: serverNow } = await api<{ authenticated: boolean; now: number }>('/api/session');
+      const session = await api<{ authenticated: boolean; now: number; trash_days?: number; update?: UpdateInfo | null }>(
+        '/api/session',
+      );
+      const { authenticated, now: serverNow } = session;
       syncClock(serverNow, sentAt, Date.now());
+      if (session.trash_days) this.trashDays = session.trash_days;
+      this.newVersion = session.update ?? null;
       this.online = true;
       this.setAuth(authenticated);
     } catch {
@@ -133,13 +187,13 @@ class NoteStore {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        return body.error ?? 'Não foi possível entrar.';
+        return t(body.error ?? 'Não foi possível entrar.');
       }
       this.online = true;
       this.setAuth(true);
       return null;
     } catch {
-      return 'Sem ligação ao servidor.';
+      return t('Sem ligação ao servidor.');
     }
   }
 
@@ -152,9 +206,21 @@ class NoteStore {
     );
     this.notes = {};
     this.rejected = {};
+    this.settings = { color_names: {}, templates: [], order: [] };
+    storeSettings(this.settings, false);
     this.outboxIds.clear();
     this.pending = 0;
     this.setAuth(false);
+  }
+
+  /** Signs out every other device (e.g. a lost phone). This one stays signed in. */
+  async logoutOthers(): Promise<string> {
+    try {
+      await api('/api/logout-others', { method: 'POST' });
+      return t('Sessão terminada nos outros dispositivos.');
+    } catch {
+      return t('Não foi possível (sem ligação ao servidor?).');
+    }
   }
 
   private setAuth(authenticated: boolean) {
@@ -237,7 +303,37 @@ class NoteStore {
     this.connectEvents();
     this.persistNow();
     await this.flush();
-    if (this.online) await this.pull();
+    if (this.online) await Promise.all([this.pull(), this.syncSettings()]);
+  }
+
+  // --- Settings ---------------------------------------------------------------
+
+  saveSettings(settings: Settings) {
+    this.settings = settings;
+    storeSettings(settings, true);
+    this.syncSettings();
+  }
+
+  /** Sends local settings changes, or fetches the server's when there are none. */
+  private async syncSettings() {
+    if (this.auth !== 'yes') return;
+    try {
+      const pending = settingsPending();
+      const sent = pending ? $state.snapshot(this.settings) : undefined;
+      const result = await api<Settings>('/api/settings', pending ? { method: 'PUT', body: JSON.stringify(sent) } : undefined);
+      // Keep a change made while the request was running; it is sent next time.
+      if (pending && JSON.stringify($state.snapshot(this.settings)) !== JSON.stringify(sent)) return;
+      this.settings = result;
+      storeSettings(result, false);
+    } catch (err) {
+      if (err instanceof HttpError && err.status === 400) storeSettings(this.settings, false);
+    }
+  }
+
+  private applySettings(settings: Settings) {
+    if (settingsPending()) return;
+    this.settings = settings;
+    storeSettings(settings, false);
   }
 
   /** Pushes the outbox to the server, in order. Safe to call any time. */
@@ -284,8 +380,8 @@ class NoteStore {
                 // Never drop the edit: keep it on the device and in the outbox, and tell the user.
                 // A later edit replaces this entry and is sent again.
                 this.rejected[id] = /too long|too many/.test(err.message)
-                  ? 'A nota é demasiado grande para guardar no servidor. Encurta-a para voltar a sincronizar.'
-                  : `O servidor recusou esta nota (${err.message}). Fica guardada só neste dispositivo.`;
+                  ? t('A nota é demasiado grande para guardar no servidor. Encurta-a para voltar a sincronizar.')
+                  : t('O servidor recusou esta nota ({error}). Fica guardada só neste dispositivo.', { error: err.message });
                 keep = true;
               } else {
                 console.warn('Apagar recusado pelo servidor; ignorado.', entry, err);
@@ -312,7 +408,11 @@ class NoteStore {
 
   /** Fetches the full server state and reconciles it with local data. */
   async pull() {
+    const startedAt = this.liveSeq;
+    // Changed by a live event after the request started: the response is older than what we have.
+    const newer = (id: string) => (this.liveChanges.get(id) ?? 0) > startedAt;
     let serverNotes: Note[];
+    this.pulls++;
     try {
       serverNotes = (await api<{ notes: Note[] }>('/api/notes')).notes;
       this.online = true;
@@ -320,12 +420,14 @@ class NoteStore {
       if (err instanceof HttpError && err.status === 401) this.setAuth(false);
       else this.online = false;
       return;
+    } finally {
+      this.pulls--;
     }
     const seen = new Set<string>();
     const toStore: Note[] = [];
     for (const note of serverNotes) {
       seen.add(note.id);
-      if (this.hasPending(note.id)) continue;
+      if (this.hasPending(note.id) || newer(note.id)) continue;
       const local = this.notes[note.id];
       if (!local || local.updated_at !== note.updated_at || local.synced !== note.updated_at) {
         note.synced = note.updated_at;
@@ -334,7 +436,9 @@ class NoteStore {
       }
     }
     // Notes deleted on another device.
-    const removed = Object.keys(this.notes).filter((id) => !seen.has(id) && !this.hasPending(id));
+    const removed = Object.keys(this.notes).filter((id) => !seen.has(id) && !this.hasPending(id) && !newer(id));
+    // Forget live changes no running sync still needs.
+    if (!this.pulls) this.liveChanges.clear();
     for (const id of removed) delete this.notes[id];
     await Promise.all([
       setMany(
@@ -352,6 +456,7 @@ class NoteStore {
     if (!force && local && local.updated_at > note.updated_at) return;
     note.synced = note.updated_at;
     this.notes[note.id] = note;
+    this.liveChanges.set(note.id, ++this.liveSeq);
     set(note.id, note, notesDb).catch(() => {});
   }
 
@@ -376,16 +481,25 @@ class NoteStore {
       const event = JSON.parse((e as MessageEvent).data);
       if (event.type === 'upsert') this.applyRemote(event.note);
       else if (event.type === 'delete' && !this.hasPending(event.id)) {
+        this.liveChanges.set(event.id, ++this.liveSeq);
         delete this.notes[event.id];
         del(event.id, notesDb).catch(() => {});
       } else if (event.type === 'reload') this.pull();
+      else if (event.type === 'settings') this.applySettings(event.settings);
+      else if (event.type === 'reminder') this.onreminder?.(event.id);
     });
     source.addEventListener('error', () => {
       if (source.readyState === EventSource.CLOSED) {
-        // The browser gave up (e.g. 401 or server down); retry manually.
+        // The browser gave up (e.g. 401 or server down). If the session was revoked, show the
+        // login screen now; otherwise retry later (never reconnect at once, to avoid a loop).
         this.events = undefined;
         this.online = false;
-        this.startRetry();
+        api<{ authenticated: boolean }>('/api/session')
+          .then(({ authenticated }) => {
+            if (!authenticated) this.setAuth(false);
+            else this.startRetry();
+          })
+          .catch(() => this.startRetry());
       }
     });
   }
@@ -425,6 +539,25 @@ class NoteStore {
     this.applyRemote(res.note, true);
   }
 
+  // --- Server status and backups -------------------------------------------------
+
+  async status(): Promise<ServerStatus> {
+    const status = await api<ServerStatus>('/api/status');
+    this.newVersion = status.update;
+    this.trashDays = status.trash_days;
+    return status;
+  }
+
+  async restoreBackup(name: string): Promise<string> {
+    await this.sync();
+    const res = await api<{ restored: number; total: number }>(`/api/backups/${encodeURIComponent(name)}/restore`, {
+      method: 'POST',
+    });
+    await this.pull();
+    if (!res.restored) return t('As notas já estavam iguais a este backup.');
+    return tn(res.restored, '{n} nota restaurada do backup.', '{n} notas restauradas do backup.');
+  }
+
   // --- Backup -----------------------------------------------------------------
 
   async previewColorNote(file: File, password: string): Promise<ColorNotePreview> {
@@ -441,7 +574,7 @@ class NoteStore {
       body: JSON.stringify({ records: preview.records, colors }),
     });
     await this.pull();
-    return `${res.imported} de ${res.total} notas importadas do ColorNote.`;
+    return t('{imported} de {total} notas importadas do ColorNote.', { imported: res.imported, total: res.total });
   }
 
   async importBackup(file: File): Promise<string> {
@@ -449,22 +582,27 @@ class NoteStore {
     try {
       data = JSON.parse(await file.text());
     } catch {
-      return 'O ficheiro não é um JSON válido.';
+      return t('O ficheiro não é um JSON válido.');
     }
     const notes = Array.isArray(data) ? data : (data as { notes?: unknown })?.notes;
-    if (!Array.isArray(notes)) return 'O ficheiro não parece ser um backup do Anotado.';
+    if (!Array.isArray(notes)) return t('O ficheiro não parece ser um backup do Anotado.');
     try {
       const res = await api<{ imported: number; total: number }>('/api/import', {
         method: 'POST',
         body: JSON.stringify({ notes }),
       });
       await this.pull();
-      return `${res.imported} de ${res.total} notas importadas.`;
+      return t('{imported} de {total} notas importadas.', { imported: res.imported, total: res.total });
     } catch (err) {
-      if (err instanceof HttpError && err.status === 400) return 'O backup contém dados inválidos.';
-      return 'Não foi possível importar (sem ligação?).';
+      if (err instanceof HttpError && err.status === 400) return t('O backup contém dados inválidos.');
+      return t('Não foi possível importar (sem ligação?).');
     }
   }
 }
 
 export const store = new NoteStore();
+
+/** The user's name for a colour, or its plain name. */
+export function colorLabel(color: Color): string {
+  return store.settings.color_names[color] || COLOR_LABELS[color];
+}

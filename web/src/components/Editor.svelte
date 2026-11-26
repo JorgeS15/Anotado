@@ -1,16 +1,29 @@
 <script lang="ts">
+  import { t, tn } from '../lib/i18n';
   import { onMount, tick } from 'svelte';
   import { autogrow } from '../lib/autogrow';
   import { now } from '../lib/clock';
   import { store } from '../lib/store.svelte';
-  import type { Color, Note } from '../lib/types';
+  import type { Color, Note, Template } from '../lib/types';
   import { LIMITS, formatCount } from '../lib/limits';
-  import { findLinks, formatFull, isEmpty, itemsToText, textToItems, uid } from '../lib/util';
+  import { download, fileName, printNote, toMarkdown } from '../lib/export';
+  import { trapFocus } from '../lib/focus';
+  import {
+    findLinks,
+    formatFull,
+    hiddenDone,
+    isEmpty,
+    itemsToText,
+    setHiddenDone,
+    textToItems,
+    uid,
+  } from '../lib/util';
   import Checklist from './Checklist.svelte';
   import History from './History.svelte';
   import ColorPicker from './ColorPicker.svelte';
   import Icon from './Icon.svelte';
   import Popover from './Popover.svelte';
+  import ReminderPicker from './ReminderPicker.svelte';
 
   let {
     id,
@@ -40,6 +53,13 @@
   let colorOpen = $state(false);
   let moreOpen = $state(false);
   let historyOpen = $state(false);
+  // svelte-ignore state_referenced_locally
+  let hideDone = $state(hiddenDone().has(id));
+  let dialogEl = $state<HTMLElement>();
+  const doneCount = $derived(note?.items.filter((i) => i.done).length ?? 0);
+
+  // Keep Tab inside the note; Escape is handled by the app (it also updates the history).
+  $effect(() => (dialogEl ? trapFocus(dialogEl) : undefined));
 
   onMount(async () => {
     if (!draft) return;
@@ -105,7 +125,7 @@
     note.archived = archived;
     changed();
     onclose();
-    notify(archived ? 'Nota arquivada' : 'Nota desarquivada', () => store.update(noteId, { archived: !archived }));
+    notify(archived ? t('Nota arquivada') : t('Nota desarquivada'), () => store.update(noteId, { archived: !archived }));
   }
 
   function moveToTrash() {
@@ -118,7 +138,7 @@
     note.deleted_at = now();
     changed();
     onclose();
-    notify('Nota movida para o lixo', () => store.update(noteId, { deleted_at: null }));
+    notify(t('Nota movida para o lixo'), () => store.update(noteId, { deleted_at: null }));
   }
 
   function restore() {
@@ -126,15 +146,80 @@
     note.deleted_at = null;
     changed();
     onclose();
-    notify('Nota restaurada');
+    notify(t('Nota restaurada'));
   }
 
   function deleteForever() {
-    if (!confirm('Apagar esta nota para sempre?')) return;
+    if (!confirm(t('Apagar esta nota para sempre?'))) return;
     const noteId = id;
     store.purge(noteId);
     onclose();
-    notify('Nota apagada');
+    notify(t('Nota apagada'));
+  }
+
+  function toggleHidden() {
+    hideDone = !hideDone;
+    setHiddenDone(id, hideDone);
+  }
+
+  function uncheckAll() {
+    if (!note) return;
+    const before = note.items.map((i) => i.done);
+    for (const item of note.items) item.done = false;
+    changed();
+    const noteId = id;
+    notify(t('Itens desmarcados'), () => {
+      const n = store.notes[noteId];
+      if (n) store.update(noteId, { items: n.items.map((item, i) => ({ ...item, done: before[i] ?? item.done })) });
+    });
+  }
+
+  function removeDone() {
+    if (!note) return;
+    const before = $state.snapshot(note.items);
+    note.items = note.items.filter((i) => !i.done);
+    changed();
+    const noteId = id;
+    notify(tn(before.length - note.items.length, '{n} item apagado', '{n} itens apagados'), () => store.update(noteId, { items: before }));
+  }
+
+  function saveTemplate() {
+    if (!note) return;
+    const { templates } = store.settings;
+    const name = prompt(t('Nome do modelo (aparece no botão +):'), note.title.trim() || t('Modelo'))?.trim().slice(0, 60);
+    if (!name) return;
+    const others = templates.filter((tpl) => tpl.name !== name);
+    if (others.length >= 30) {
+      notify(t('Já tens 30 modelos. Apaga algum no botão + → Gerir modelos.'));
+      return;
+    }
+    const template: Template = {
+      id: uid(),
+      name,
+      type: note.type,
+      title: note.title,
+      content: note.type === 'text' ? note.content : '',
+      items: note.type === 'checklist' ? note.items.map((i) => i.text).filter((t) => t.trim()) : [],
+      color: note.color,
+    };
+    store.saveSettings({ ...$state.snapshot(store.settings), templates: [...others, template] });
+    notify(t('Modelo "{name}" guardado', { name }));
+  }
+
+  function exportMarkdown() {
+    if (!note) return;
+    download(fileName(note, 'md'), toMarkdown(note));
+  }
+
+  function print() {
+    if (note) printNote($state.snapshot(note) as Note);
+  }
+
+  function onkeydown(e: KeyboardEvent) {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
+      e.preventDefault();
+      print();
+    }
   }
 
   function asText(n: Note) {
@@ -156,9 +241,9 @@
     }
     try {
       await navigator.clipboard.writeText(text);
-      notify('Nota copiada para a área de transferência');
+      notify(t('Nota copiada para a área de transferência'));
     } catch {
-      notify('Não foi possível partilhar a nota');
+      notify(t('Não foi possível partilhar a nota'));
     }
   }
 
@@ -171,13 +256,14 @@
       id: uid(),
       items: copy.items.map((i) => ({ ...i, id: uid() })),
       pinned: false,
+      reminder_at: null,
       created_at: time,
       updated_at: time,
       synced: undefined,
     };
     store.put(dup, false);
     onopen(dup.id);
-    notify('Nota duplicada');
+    notify(t('Nota duplicada'));
   }
 
   function hostname(url: string) {
@@ -191,20 +277,35 @@
 
 {#if note}
   <div class="backdrop" role="presentation" onclick={(e) => e.target === e.currentTarget && onclose()}>
-    <div class="editor scroll" style:--note="var(--note-{note.color})" role="dialog" aria-label="Editar nota">
+    <div
+      class="editor scroll"
+      style:--note="var(--note-{note.color})"
+      role="dialog"
+      aria-modal="true"
+      aria-label={t('Editar nota')}
+      tabindex="-1"
+      bind:this={dialogEl}
+      {onkeydown}>
       <header>
-        <button class="icon-btn" onclick={onclose} aria-label="Voltar"><Icon name="back" /></button>
+        <button class="icon-btn" onclick={onclose} aria-label={t('Voltar')}><Icon name="back" /></button>
         <span class="spacer"></span>
         {#if trashed}
-          <button class="icon-btn" onclick={restore} title="Restaurar"><Icon name="restore" /></button>
-          <button class="icon-btn" onclick={deleteForever} title="Apagar para sempre"><Icon name="trash" /></button>
+          <button class="icon-btn" onclick={restore} title={t('Restaurar')}><Icon name="restore" /></button>
+          <button class="icon-btn" onclick={deleteForever} title={t('Apagar para sempre')}><Icon name="trash" /></button>
         {:else}
-          <button class="icon-btn" class:active={note.pinned} onclick={togglePin} title={note.pinned ? 'Desafixar' : 'Fixar'}>
+          <button class="icon-btn" class:active={note.pinned} onclick={togglePin} title={note.pinned ? t('Desafixar') : t('Fixar')}>
             <Icon name="pin" />
           </button>
+          <ReminderPicker
+            value={note.reminder_at}
+            onchange={(at) => {
+              note.reminder_at = at;
+              changed();
+            }}
+            {notify} />
           <Popover bind:open={colorOpen}>
             {#snippet trigger(toggle)}
-              <button class="icon-btn" onclick={toggle} title="Cor"><Icon name="palette" /></button>
+              <button class="icon-btn" onclick={toggle} title={t('Cor')}><Icon name="palette" /></button>
             {/snippet}
             {#snippet children()}
               <div class="picker"><ColorPicker value={note.color} onpick={setColor} /></div>
@@ -212,24 +313,38 @@
           </Popover>
           <Popover bind:open={moreOpen}>
             {#snippet trigger(toggle)}
-              <button class="icon-btn" onclick={toggle} title="Mais opções"><Icon name="more" /></button>
+              <button class="icon-btn" onclick={toggle} title={t('Mais opções')}><Icon name="more" /></button>
             {/snippet}
             {#snippet children(close)}
               <button class="item" onclick={() => (close(), convert())}>
                 <Icon name={note.type === 'text' ? 'checklist' : 'text'} />
-                {note.type === 'text' ? 'Converter em checklist' : 'Converter em texto'}
+                {note.type === 'text' ? t('Converter em checklist') : t('Converter em texto')}
               </button>
-              <button class="item" onclick={() => (close(), share())}><Icon name="share" /> Partilhar</button>
-              <button class="item" onclick={() => (close(), duplicate())}><Icon name="copy" /> Duplicar</button>
+              {#if note.type === 'checklist' && doneCount}
+                <button class="item" onclick={() => (close(), uncheckAll())}><Icon name="uncheck" /> {t('Desmarcar tudo')}</button>
+                <button class="item" onclick={() => (close(), removeDone())}>
+                  <Icon name="broom" /> {t('Apagar concluídos')}
+                </button>
+                <hr />
+              {/if}
+              <button class="item" onclick={() => (close(), share())}><Icon name="share" /> {t('Partilhar')}</button>
+              <button class="item" onclick={() => (close(), exportMarkdown())}>
+                <Icon name="download" /> {t('Descarregar (.md)')}
+              </button>
+              <button class="item" onclick={() => (close(), print())}><Icon name="print" /> {t('Imprimir')}</button>
+              <button class="item" onclick={() => (close(), duplicate())}><Icon name="copy" /> {t('Duplicar')}</button>
+              <button class="item" onclick={() => (close(), saveTemplate())}>
+                <Icon name="template" /> {t('Guardar como modelo')}
+              </button>
               <button class="item" onclick={() => (close(), (historyOpen = true))}>
-                <Icon name="history" /> Histórico
+                <Icon name="history" /> {t('Histórico')}
               </button>
               <button class="item" onclick={() => (close(), toggleArchive())}>
                 <Icon name={note.archived ? 'unarchive' : 'archive'} />
-                {note.archived ? 'Desarquivar' : 'Arquivar'}
+                {note.archived ? t('Desarquivar') : t('Arquivar')}
               </button>
               <button class="item danger" onclick={() => (close(), moveToTrash())}>
-                <Icon name="trash" /> Mover para o lixo
+                <Icon name="trash" /> {t('Mover para o lixo')}
               </button>
             {/snippet}
           </Popover>
@@ -238,20 +353,20 @@
 
       <div class="body">
         {#if trashed}
-          <p class="banner">Esta nota está no lixo. Restaura-a para a editar.</p>
+          <p class="banner">{t('Esta nota está no lixo. Restaura-a para a editar.')}</p>
         {/if}
         {#if rejected}
           <p class="banner warning" role="alert"><Icon name="warning" size={18} /> {rejected}</p>
         {/if}
         <input
           class="title"
-          placeholder="Título"
+          placeholder={t('Título')}
           maxlength={LIMITS.title}
           bind:value={note.title}
           oninput={changed}
           readonly={trashed}
           onkeydown={(e) => {
-            if (e.key === 'Enter') {
+            if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) {
               e.preventDefault();
               if (note.type === 'text') contentEl?.focus();
             }
@@ -260,7 +375,7 @@
         {#if note.type === 'text'}
           <textarea
             class="content"
-            placeholder="Escreve aqui…"
+            placeholder={t('Escreve aqui…')}
             maxlength={LIMITS.content}
             bind:this={contentEl}
             bind:value={note.content}
@@ -275,20 +390,25 @@
             </div>
           {/if}
         {:else}
-          <Checklist items={note.items} readonly={trashed} onchange={changed} />
+          <Checklist
+            items={note.items}
+            readonly={trashed}
+            {hideDone}
+            onchange={changed}
+            ontogglehidden={toggleHidden} />
         {/if}
       </div>
 
       <footer>
         {#if nearLimit}
           <span class="limit" class:full={note.content.length >= LIMITS.content}>
-            {formatCount(note.content.length)} / {formatCount(LIMITS.content)} caracteres{note.content.length >=
+            {t('{count} / {max} caracteres', { count: formatCount(note.content.length), max: formatCount(LIMITS.content) })}{note.content.length >=
             LIMITS.content
-              ? ' — limite atingido'
+              ? t(' — limite atingido')
               : ''}
           </span><br />
         {/if}
-        Editada {formatFull(note.updated_at)} · Criada {formatFull(note.created_at)}
+        {t('Editada {updated} · Criada {created}', { updated: formatFull(note.updated_at), created: formatFull(note.created_at) })}
       </footer>
     </div>
   </div>
@@ -298,7 +418,7 @@
       onclose={() => (historyOpen = false)}
       onrestored={() => {
         historyOpen = false;
-        notify('Versão restaurada');
+        notify(t('Versão restaurada'));
       }} />
   {/if}
 {/if}

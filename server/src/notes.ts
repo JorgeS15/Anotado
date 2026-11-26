@@ -17,6 +17,8 @@ export interface ChecklistItem {
   id: string;
   text: string;
   done: boolean;
+  /** 1 for a sub-item of the item above it. Left out for top-level items. */
+  indent?: 1;
 }
 
 export interface Note {
@@ -31,6 +33,8 @@ export interface Note {
   deleted_at: number | null;
   created_at: number;
   updated_at: number;
+  /** When to send a notification for this note, if ever. */
+  reminder_at?: number | null;
 }
 
 export class ValidationError extends Error {}
@@ -75,6 +79,7 @@ export function validateNote(input: unknown): Note {
       id: validateId(item.id),
       text: str(item.text, `items[${i}].text`, 10_000),
       done: item.done === true,
+      ...(item.indent === 1 && { indent: 1 as const }),
     };
   });
 
@@ -91,5 +96,67 @@ export function validateNote(input: unknown): Note {
     deleted_at: n.deleted_at === null || n.deleted_at === undefined ? null : time(n.deleted_at, 'deleted_at'),
     created_at: n.created_at === undefined ? updated_at : time(n.created_at, 'created_at'),
     updated_at,
+    reminder_at: n.reminder_at === null || n.reminder_at === undefined ? null : time(n.reminder_at, 'reminder_at'),
   };
+}
+
+export interface Template {
+  id: string;
+  /** Shown in the "new note" menu. */
+  name: string;
+  type: NoteType;
+  title: string;
+  content: string;
+  /** Item texts; notes made from the template start with them unticked. */
+  items: string[];
+  color: Color;
+}
+
+export interface Settings {
+  /** A name for each colour, e.g. green = "Compras". Unnamed colours are left out. */
+  color_names: Partial<Record<Color, string>>;
+  templates: Template[];
+  /** Note ids in the order chosen by hand (sort "Manual"). Notes not listed come first. */
+  order: string[];
+}
+
+export const DEFAULT_SETTINGS: Settings = { color_names: {}, templates: [], order: [] };
+const MAX_ORDER = 20_000;
+const MAX_TEMPLATES = 30;
+
+function validateTemplate(input: unknown, i: number): Template {
+  if (!input || typeof input !== 'object') throw new ValidationError(`templates[${i}] must be an object`);
+  const t = input as Record<string, unknown>;
+  const items = t.items ?? [];
+  if (!Array.isArray(items) || items.length > MAX_ITEMS) throw new ValidationError(`templates[${i}].items must be a list`);
+  const type = t.type === 'checklist' ? 'checklist' : 'text';
+  const name = str(t.name, `templates[${i}].name`, 60).trim();
+  if (!name) throw new ValidationError(`templates[${i}].name must not be empty`);
+  return {
+    id: validateId(t.id),
+    name,
+    type,
+    title: str(t.title, `templates[${i}].title`, 1_000),
+    content: type === 'text' ? str(t.content, `templates[${i}].content`, MAX_TEXT) : '',
+    items: type === 'checklist' ? items.map((text, j) => str(text, `templates[${i}].items[${j}]`, 10_000)) : [],
+    color: COLORS.includes(t.color as Color) ? (t.color as Color) : 'yellow',
+  };
+}
+
+export function validateSettings(input: unknown): Settings {
+  if (!input || typeof input !== 'object') throw new ValidationError('settings must be an object');
+  const raw = (input as Record<string, unknown>).color_names ?? {};
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new ValidationError('color_names must be an object');
+  const color_names: Settings['color_names'] = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (!COLORS.includes(key as Color)) throw new ValidationError(`unknown colour: ${key}`);
+    const name = str(value, `color_names.${key}`, 40).trim();
+    if (name) color_names[key as Color] = name;
+  }
+  const templates = (input as Record<string, unknown>).templates ?? [];
+  if (!Array.isArray(templates)) throw new ValidationError('templates must be a list');
+  if (templates.length > MAX_TEMPLATES) throw new ValidationError(`at most ${MAX_TEMPLATES} templates`);
+  const order = (input as Record<string, unknown>).order ?? [];
+  if (!Array.isArray(order) || order.length > MAX_ORDER) throw new ValidationError('order must be a list of note ids');
+  return { color_names, templates: templates.map(validateTemplate), order: [...new Set(order.map(validateId))] };
 }

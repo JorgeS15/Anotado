@@ -27,8 +27,25 @@
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
+        e.stopPropagation();
         close();
+        root.querySelector<HTMLElement>('button')?.focus();
+        return;
       }
+      // Arrow keys move between the menu's options.
+      if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return;
+      const options = [...root.querySelectorAll<HTMLElement>('.panel button:not([disabled]), .panel a[href]')];
+      if (!options.length || !root.contains(document.activeElement)) return;
+      // Fields (like the reminder's date and time) use the arrow keys themselves.
+      if ((document.activeElement as HTMLElement).closest('input, textarea, select')) return;
+      e.preventDefault();
+      const at = options.indexOf(document.activeElement as HTMLElement);
+      const next =
+        e.key === 'Home' ? 0
+        : e.key === 'End' ? options.length - 1
+        : e.key === 'ArrowDown' ? (at + 1) % options.length
+        : (at <= 0 ? options.length : at) - 1;
+      options[next].focus();
     };
     document.addEventListener('pointerdown', onDown, true);
     document.addEventListener('keydown', onKey, true);
@@ -59,6 +76,9 @@
     right: 0;
     z-index: 50;
     min-width: 220px;
+    max-height: calc(100dvh - 90px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
     padding: 6px;
     background: var(--surface);
     color: var(--text);

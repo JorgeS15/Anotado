@@ -3,16 +3,22 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createApp } from './app.ts';
 import { generateSecret } from './auth.ts';
-import { dailyBackup } from './backup.ts';
+import { dailyBackup, listBackups } from './backup.ts';
 import { Store } from './db.ts';
-
-const TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+import { sendDueReminders } from './reminders.ts';
+import { WebDavUploader } from './remote.ts';
+import { generateVapidKeys, type VapidKeys } from './webpush.ts';
+import { UpdateChecker } from './updates.ts';
 
 const port = Number(process.env.PORT ?? 4008);
 const dataDir = resolve(process.env.DATA_DIR ?? './data');
 const webDir = resolve(process.env.WEB_DIR ?? resolve(import.meta.dirname, '../../web/dist'));
 const password = process.env.ANOTADO_PASSWORD ?? '';
 const backupKeep = Number(process.env.BACKUP_KEEP ?? 30);
+const trashDays = Number(process.env.TRASH_DAYS ?? 30);
+const trustProxy = !/^(0|false|no)$/i.test(process.env.TRUST_PROXY ?? 'true');
+const apiToken = process.env.ANOTADO_API_TOKEN || undefined;
+const updateCheck = !/^(0|false|no)$/i.test(process.env.UPDATE_CHECK ?? 'true');
 const { version } = JSON.parse(readFileSync(resolve(import.meta.dirname, '../package.json'), 'utf8'));
 
 // The example value from docker-compose.yml / README must never protect a real server.
@@ -30,7 +36,21 @@ if (password.length < 8) {
   console.warn('ANOTADO_PASSWORD is shorter than 8 characters. Consider a longer password.');
 }
 
-const store = new Store(resolve(dataDir, 'anotado.db'));
+if (!(trashDays >= 1)) {
+  console.error('TRASH_DAYS must be a number of days, 1 or more.');
+  process.exit(1);
+}
+if (apiToken && (apiToken.length < 24 || apiToken === password)) {
+  console.error('ANOTADO_API_TOKEN must have at least 24 characters and differ from the password. Try: openssl rand -hex 24');
+  process.exit(1);
+}
+
+const dbFile = resolve(dataDir, 'anotado.db');
+const backupDir = resolve(process.env.BACKUP_DIR || resolve(dataDir, 'backups'));
+const remote = process.env.BACKUP_WEBDAV_URL
+  ? new WebDavUploader(process.env.BACKUP_WEBDAV_URL, process.env.BACKUP_WEBDAV_USER, process.env.BACKUP_WEBDAV_PASSWORD)
+  : undefined;
+const store = new Store(dbFile);
 
 let secret = process.env.SESSION_SECRET || store.getMeta('session_secret');
 if (!secret) {
@@ -38,19 +58,67 @@ if (!secret) {
   store.setMeta('session_secret', secret);
 }
 
-const { app, broadcast } = createApp({ store, password, secret, webDir, version });
+// Keys for Web Push, generated once and kept in the database.
+let vapid: VapidKeys;
+try {
+  vapid = JSON.parse(store.getMeta('vapid') ?? '');
+} catch {
+  vapid = generateVapidKeys();
+  store.setMeta('vapid', JSON.stringify(vapid));
+}
+const push = { keys: vapid, subject: process.env.VAPID_SUBJECT || 'https://github.com/JorgeS15/Anotado' };
+
+const updates = updateCheck ? new UpdateChecker(version) : undefined;
+const { app, broadcast } = createApp({
+  store,
+  password,
+  secret,
+  webDir,
+  version,
+  trashDays,
+  trustProxy,
+  apiToken,
+  backupDir,
+  dbFile,
+  updates,
+  remote,
+  push,
+});
 
 const purge = () => {
-  for (const id of store.purgeTrash(Date.now() - TRASH_RETENTION_MS)) broadcast({ type: 'delete', id });
+  for (const id of store.purgeTrash(Date.now() - trashDays * 24 * 60 * 60 * 1000)) broadcast({ type: 'delete', id });
 };
 purge();
 setInterval(purge, 6 * 60 * 60 * 1000).unref();
 
+let sending = false;
+const reminders = async () => {
+  if (sending) return;
+  sending = true;
+  try {
+    await sendDueReminders(store, push, (note) => broadcast({ type: 'reminder', id: note.id }));
+  } catch (err) {
+    console.error('Reminders failed:', err);
+  } finally {
+    sending = false;
+  }
+};
+void reminders();
+setInterval(reminders, 20 * 1000).unref();
+
 const backup = () => {
   if (!(backupKeep > 0)) return;
   try {
-    const file = dailyBackup(store, resolve(dataDir, 'backups'), backupKeep);
+    const file = dailyBackup(store, backupDir, backupKeep);
     if (file) console.log(`Backup written: ${file}`);
+    // Send the newest backup to WebDAV; a failed upload is retried on the next hourly run.
+    const latest = listBackups(backupDir)[0];
+    if (remote && latest && remote.pending(latest.name)) {
+      void remote.upload(resolve(backupDir, latest.name)).then((ok) => {
+        if (ok) console.log(`Backup copied to ${remote.status.target}`);
+        else console.error(`Backup copy to ${remote.status.target} failed: ${remote.status.last_error?.message}`);
+      });
+    }
   } catch (err) {
     console.error('Backup failed:', err);
   }

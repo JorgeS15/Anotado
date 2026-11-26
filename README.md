@@ -1,21 +1,36 @@
 # Anotado
 
+*[English](README.en.md)*
+
 Notas simples e coloridas, ao estilo do ColorNote, para usar no PC e no telemóvel (PWA).
 
+<p align="center">
+  <img src="docs/screenshot-desktop.png" alt="O Anotado no PC: notas coloridas em grelha, com checklists e notas de texto" width="640">
+  <img src="docs/screenshot-mobile-note.png" alt="Uma checklist aberta no telemóvel" width="180">
+</p>
+
 - Notas de **texto** e **checklist**
-- **9 cores** que servem de categorias, com filtro por cor
-- Fixar, arquivar e lixo (as notas no lixo são apagadas ao fim de 30 dias)
-- Pesquisa (ignora acentos), vista em grelha ou em lista, ordenação
+- **9 cores** que servem de categorias, com filtro por cor e **nomes para as cores** (ex.: verde = "Compras")
+- Checklists com sub-itens, "Desmarcar tudo", "Apagar concluídos" e concluídos recolhíveis
+- **Lembretes** com notificação no telemóvel e no PC, mesmo com a app fechada
+- **Modelos** de notas (ex.: lista de compras base)
+- Fixar, arquivar e lixo (as notas no lixo são apagadas ao fim de 30 dias, configurável)
+- Pesquisa (ignora acentos), vista em grelha ou em lista, ordenação, tamanho da letra
 - Guarda automaticamente
 - **Funciona offline**: as notas ficam guardadas no dispositivo e as alterações são enviadas quando a ligação voltar
 - Sincronização em tempo real entre dispositivos
 - **Nada se perde**: se a mesma nota for editada em dois dispositivos ao mesmo tempo, a versão que perde fica guardada como "(conflito)"
 - **Histórico** de cada nota, com restauro de versões anteriores
-- **Backups diários automáticos** no servidor, além de exportar e importar backup (JSON)
+- **Backups diários automáticos** no servidor, que se podem descarregar e restaurar a partir da app;
+  também exportar e importar backup (JSON)
+- Exportar uma nota em Markdown ou imprimi-la
 - **Importar do ColorNote** (backup `.doc`/`.dat`)
 - Seleção múltipla (toque longo ou **Menu → Selecionar notas**) para mudar cor, fixar, arquivar ou apagar várias notas de uma vez
 - Partilhar e duplicar notas; partilhar de outras apps **para** o Anotado (Android)
-- Modo claro e escuro
+- Modo claro e escuro; interface em português e inglês (segue a língua do browser, ou escolhe no menu)
+- **Automações**: com um token de API, o Home Assistant, os Atalhos do iPhone ou o Tasker podem
+  criar notas e acrescentar itens a uma lista ([guia](docs/automacoes.md))
+- Avisa quando há uma versão nova
 - Um só utilizador, protegido por password
 
 O que vem a seguir está no [ROADMAP](ROADMAP.md).
@@ -54,11 +69,37 @@ docker compose up -d
 | `PORT`             | não         | Porta HTTP (por omissão `4008`).                                             |
 | `SESSION_SECRET`   | não         | Segredo das sessões. Se não for definido, é gerado e guardado na base de dados. |
 | `BACKUP_KEEP`      | não         | Quantos backups diários guardar (por omissão `30`; `0` desliga).             |
+| `BACKUP_DIR`       | não         | Pasta dos backups diários (por omissão `/data/backups`). Pode ser outro volume, por exemplo um NAS. |
+| `BACKUP_WEBDAV_URL` | não        | Pasta WebDAV para onde copiar cada backup diário (Nextcloud, NAS…). Ver abaixo. |
+| `BACKUP_WEBDAV_USER` / `BACKUP_WEBDAV_PASSWORD` | não | Credenciais da pasta WebDAV. |
+| `TRASH_DAYS`       | não         | Dias que as notas ficam no lixo antes de serem apagadas (por omissão `30`).  |
+| `ANOTADO_API_TOKEN` | não        | Token para automações (24+ caracteres). Ver [Automações](docs/automacoes.md). |
+| `TRUST_PROXY`      | não         | `true` (por omissão) atrás do Caddy; `false` se a porta estiver exposta diretamente. |
+| `VAPID_SUBJECT`    | não         | Contacto enviado aos serviços de notificações (`mailto:…` ou `https://…`). |
+| `UPDATE_CHECK`     | não         | `false` para não verificar uma vez por dia se há uma versão nova no GitHub.  |
 | `TZ`               | não         | Fuso horário.                                                                |
 
 Os dados ficam em `/data/anotado.db` (SQLite). Todos os dias é escrito um backup em
-`/data/backups/anotado-AAAA-MM-DD.json` (os últimos 30 são mantidos), que pode ser importado em
-**Menu → Importar backup**. Também podes copiar a pasta `data` ou usar **Menu → Exportar backup**.
+`/data/backups/anotado-AAAA-MM-DD.json` (os últimos 30 são mantidos). Em **Menu → Servidor e backups**
+vês a lista, descarregas um backup ou restauras as notas como estavam nesse dia (a versão atual de cada
+nota fica no histórico). Também podes copiar a pasta `data` ou usar **Menu → Exportar backup**.
+
+#### Cópia dos backups para fora do servidor
+
+Os backups ficam no mesmo disco que a base de dados. Para os guardar também noutro sítio, indica
+uma pasta WebDAV; cada backup diário é lá copiado (e reenviado na hora seguinte se falhar):
+
+```yaml
+      BACKUP_WEBDAV_URL: https://nuvem.exemplo.pt/remote.php/dav/files/jorge/Anotado/
+      BACKUP_WEBDAV_USER: jorge
+      BACKUP_WEBDAV_PASSWORD: palavra-passe-de-aplicacao
+```
+
+No Nextcloud, cria antes a pasta `Anotado` e usa uma palavra-passe de aplicação
+(Definições → Segurança). O estado da última cópia aparece em **Menu → Servidor e backups**.
+
+A verificação de versões só pede a última release pública do Anotado à API do GitHub; não envia
+nada sobre o teu servidor.
 
 ### Versões da imagem
 
@@ -81,7 +122,9 @@ notas.teudominio.pt {
 
 Se o Caddy não estiver na mesma rede Docker, usa `reverse_proxy localhost:4008`.
 O HTTPS é necessário para instalar a PWA e para a app funcionar offline.
-Não exponhas a porta 4008 diretamente à internet; usa sempre o Caddy à frente.
+Não exponhas a porta 4008 diretamente à internet; usa sempre o Caddy à frente. Se mesmo assim o
+fizeres, define `TRUST_PROXY=false`, para o limite de tentativas de login não confiar no cabeçalho
+`X-Forwarded-For`, que nesse caso qualquer um pode inventar.
 
 ### Instalar no telemóvel
 
@@ -100,6 +143,18 @@ Com a app instalada no Android:
 - A app pede ao sistema para não apagar as notas guardadas no telemóvel, mesmo com pouco espaço.
 - Quando há uma versão nova, aparece um aviso com o botão **Atualizar**.
 
+## Lembretes
+
+No editor, o sino define um lembrete (daqui a 1 hora, amanhã às 9:00, ou uma data à escolha).
+Na hora certa, o servidor envia uma notificação a todos os dispositivos onde as notificações estão
+ativas, mesmo com a app fechada; tocar na notificação abre a nota.
+
+- Da primeira vez que defines um lembrete num dispositivo, o browser pede autorização para notificações.
+  Podes ativá-las, desativá-las ou enviar um teste em **Menu → Servidor e backups**.
+- No iPhone, as notificações só funcionam com a app instalada no ecrã principal (iOS 16.4 ou mais recente).
+- As notificações passam pelo serviço de push do browser (Google, Apple ou Mozilla), encriptadas:
+  esse serviço não consegue ler o conteúdo. O servidor precisa de poder fazer pedidos HTTPS para fora.
+
 ## Importar do ColorNote
 
 1. No ColorNote, faz um backup (**Definições → Backup**). O ficheiro fica em `data/colornote/backup`
@@ -112,17 +167,34 @@ As checklists, notas arquivadas e datas são mantidas. Importar o mesmo backup o
 as notas em vez de as duplicar. O formato do ColorNote não é público: se o teu backup não for
 reconhecido, abre uma issue.
 
+## Automações
+
+Com `ANOTADO_API_TOKEN` definido, outras apps podem criar notas e acrescentar itens a uma checklist
+pelo nome, por exemplo para dizer ao Home Assistant *"adiciona leite à lista de compras"*:
+
+```sh
+curl -X POST https://notas.teudominio.pt/api/lists/items \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"list": "Compras", "items": ["Leite"]}'
+```
+
+O guia completo, com exemplos para o Home Assistant (incluindo voz com o Assist), Atalhos do iPhone
+e Tasker, está em [docs/automacoes.md](docs/automacoes.md).
+
 ## Atalhos de teclado (PC)
 
-| Tecla | Ação                    |
-| ----- | ----------------------- |
-| `N`   | Nova nota de texto      |
-| `L`   | Nova checklist          |
-| `/`   | Pesquisar               |
-| `Esc` | Fechar a nota / limpar a pesquisa |
+| Tecla          | Ação                                |
+| -------------- | ----------------------------------- |
+| `N`            | Nova nota de texto                  |
+| `L`            | Nova checklist                      |
+| `/`            | Pesquisar                           |
+| `?`            | Mostrar os atalhos                  |
+| `Esc`          | Fechar a nota / limpar a pesquisa   |
+| `Ctrl`+`Enter` | Fechar a nota                       |
+| `Ctrl`+`P`     | Imprimir a nota aberta              |
 
-Nas checklists, `Enter` cria um novo item e `Backspace` num item vazio apaga-o.
-`Ctrl`+clique numa nota seleciona-a; `Esc` cancela a seleção.
+Nas checklists, `Enter` cria um novo item, `Tab` torna-o sub-item, `Backspace` num item vazio apaga-o, `Alt`+`↑`/`↓` move o
+item e `Ctrl`+`Espaço` marca-o. `Ctrl`+clique numa nota seleciona-a; `Esc` cancela a seleção.
 
 ## Desenvolvimento
 

@@ -21,14 +21,23 @@ export class Sessions {
   private secret: string;
   // Tied to the password, so changing it logs out every device.
   private passwordTag: string;
+  /** Raised by "sign out everywhere": sessions issued before no longer verify. */
+  private epoch: number;
 
-  constructor(secret: string, password: string) {
+  constructor(secret: string, password: string, epoch = 0) {
     this.secret = secret;
     this.passwordTag = sha256(`anotado:${password}`).toString('hex').slice(0, 16);
+    this.epoch = epoch;
+  }
+
+  setEpoch(epoch: number) {
+    this.epoch = epoch;
   }
 
   private sign(issued: number): string {
-    return createHmac('sha256', this.secret).update(`${issued}:${this.passwordTag}`).digest('base64url');
+    // Epoch 0 keeps the signature of older versions, so upgrading does not sign anyone out.
+    const data = this.epoch ? `${issued}:${this.passwordTag}:${this.epoch}` : `${issued}:${this.passwordTag}`;
+    return createHmac('sha256', this.secret).update(data).digest('base64url');
   }
 
   create(now = Date.now()): string {

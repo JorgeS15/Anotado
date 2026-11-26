@@ -94,13 +94,24 @@
   box-sizing: border-box;
 }
 
+html {
+  font-size: 16px;
+}
+
+html[data-font='small'] {
+  font-size: 14.5px;
+}
+
+html[data-font='large'] {
+  font-size: 18px;
+}
+
 html,
 body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
   font-family: var(--font);
-  font-size: 16px;
   line-height: 1.45;
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
@@ -145,6 +156,11 @@ button {
   background: color-mix(in srgb, currentColor 10%, transparent);
 }
 
+.icon-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 .icon-btn.active {
   color: var(--accent);
 }
@@ -178,4 +194,27 @@ button {
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
+}
+
+/* Sticky app header (also used by the selection bar). */
+.top {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: max(10px, env(safe-area-inset-top)) 12px 6px 16px;
+  background: var(--bg);
+}
+
+.top h1 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+[role="dialog"]:focus {
+  outline: none;
 }

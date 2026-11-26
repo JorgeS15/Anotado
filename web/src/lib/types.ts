@@ -1,16 +1,17 @@
+import { t } from './i18n';
 export const COLORS = ['yellow', 'orange', 'red', 'pink', 'purple', 'blue', 'green', 'gray', 'white'] as const;
 export type Color = (typeof COLORS)[number];
 
 export const COLOR_LABELS: Record<Color, string> = {
-  yellow: 'Amarelo',
-  orange: 'Laranja',
-  red: 'Vermelho',
-  pink: 'Rosa',
-  purple: 'Roxo',
-  blue: 'Azul',
-  green: 'Verde',
-  gray: 'Cinzento',
-  white: 'Branco',
+  yellow: t('Amarelo'),
+  orange: t('Laranja'),
+  red: t('Vermelho'),
+  pink: t('Rosa'),
+  purple: t('Roxo'),
+  blue: t('Azul'),
+  green: t('Verde'),
+  gray: t('Cinzento'),
+  white: t('Branco'),
 };
 
 export type NoteType = 'text' | 'checklist';
@@ -19,6 +20,8 @@ export interface ChecklistItem {
   id: string;
   text: string;
   done: boolean;
+  /** 1 for a sub-item of the item above it. */
+  indent?: 1;
 }
 
 export interface Note {
@@ -33,6 +36,8 @@ export interface Note {
   deleted_at: number | null;
   created_at: number;
   updated_at: number;
+  /** When to notify about this note. */
+  reminder_at?: number | null;
   /** Local only: the server `updated_at` this device last saw for the note. */
   synced?: number;
 }
@@ -60,7 +65,56 @@ export interface ColorNotePreview {
   colors: { index: number; count: number; samples: string[]; suggested: Color }[];
 }
 
-export type View = 'notes' | 'archive' | 'trash';
-export type SortMode = 'updated' | 'created' | 'color' | 'title';
+export type View = 'notes' | 'reminders' | 'archive' | 'trash';
+export type SortMode = 'updated' | 'created' | 'color' | 'title' | 'manual';
 export type Layout = 'grid' | 'list';
 export type Theme = 'auto' | 'light' | 'dark';
+
+export interface Template {
+  id: string;
+  name: string;
+  type: NoteType;
+  title: string;
+  content: string;
+  items: string[];
+  color: Color;
+}
+
+export interface Settings {
+  /** A name for each colour, e.g. green = "Compras". */
+  color_names: Partial<Record<Color, string>>;
+  templates: Template[];
+  /** Note ids in the order chosen by hand. */
+  order: string[];
+}
+
+export interface BackupInfo {
+  name: string;
+  size: number;
+  created_at: number;
+}
+
+export interface UpdateInfo {
+  version: string;
+  url: string;
+}
+
+export interface ServerStatus {
+  version: string;
+  update: UpdateInfo | null;
+  notes: number;
+  archived: number;
+  trashed: number;
+  db_size: number;
+  trash_days: number;
+  api_token: boolean;
+  /** Copy of the backups to WebDAV, if configured. */
+  remote: {
+    target: string;
+    last_ok?: { name: string; at: number };
+    last_error?: { message: string; at: number };
+  } | null;
+  backups: BackupInfo[];
+}
+
+export type FontSize = 'small' | 'normal' | 'large';

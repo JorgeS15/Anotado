@@ -9,41 +9,44 @@ O Anotado quer continuar a ser **simples**: uma ideia só entra se não complica
 
 ---
 
-## Agora — fiabilidade e versão pública (1.1.x)
+## Feito na 1.2.0
 
-Feitos na 1.1.3: alterações recusadas pelo servidor já não se perdem, limites visíveis no editor e sessão renovada com o uso.
+Lembretes com notificação, interface em inglês, nomes para as cores, ordem manual das notas, sub-itens, "Desmarcar tudo", "Apagar concluídos" e concluídos recolhíveis nas checklists, modelos de notas, ecrã
+"Servidor e backups" com restauro, cópia dos backups para WebDAV, terminar sessão nos outros dispositivos, `TRASH_DAYS`, `TRUST_PROXY`, barra do sistema com a cor da nota,
+atalhos novos com ajuda (`?`), tamanho da letra, exportar e imprimir uma nota, aviso de versão nova,
+token de API para automações com guia para o Home Assistant, README em inglês com capturas de ecrã,
+CI de volta ao `ubuntu-latest` e o `App.svelte` dividido em componentes. Detalhes no [CHANGELOG](CHANGELOG.md).
 
-| # | O quê | Porquê | Esforço |
-|---|---|---|---|
-| 1 | **Testar a importação do ColorNote com um backup real** | O formato não é público. A importação só foi testada com ficheiros gerados no mesmo formato. Desde a 1.1.3, as mensagens de erro dizem em que passo um backup falha. | P |
-| 2 | **README em inglês e captura de ecrã** | Para um projeto público, o README só em português chega a pouca gente, e uma imagem explica a app em segundos. | P |
-| 3 | **Atualizar o Playwright e voltar ao `ubuntu-latest` no CI** | O CI está fixo no Ubuntu 24.04 porque o Playwright 1.56 não suporta o 26.04. | P |
-| 4 | **Rever os PRs do Dependabot com versões principais** | TypeScript 7, Node 26, `@types/node` 26: atualizar um de cada vez, com os testes a confirmar, ou fechar. | P–M |
-| 5 | **Dividir o `App.svelte`** | Com quase 900 linhas, junta cabeçalho, filtros, seleção, menus e navegação. Separar em componentes torna as próximas alterações mais seguras. | M |
-
-## Próximo — uso do dia a dia (1.2)
+## Agora — fiabilidade
 
 | # | O quê | Porquê | Esforço |
 |---|---|---|---|
-| 6 | **Ações em bloco nas checklists**: "Desmarcar tudo" e "Apagar concluídos" | Essencial para listas de compras reutilizadas. É das coisas mais usadas no ColorNote. | P |
-| 7 | **Nomes para as cores** (ex.: verde = "Compras", azul = "Trabalho") | As cores fazem de categorias. Com nome, o filtro fica claro e mais fácil de lembrar. | P |
-| 8 | **Restaurar backups do servidor a partir da app** | Os backups diários já existem em `/data/backups`, mas para os usar é preciso aceder ao servidor e importar o JSON à mão. Um ecrã "Backups" com a lista e um botão "Restaurar" resolve isso. | M |
-| 9 | **Ordem manual das notas** (arrastar na grelha) | Hoje só há ordenação automática (data, cor, título). | M |
-| 10 | **Acessibilidade com teclado e leitor de ecrã** | Os diálogos não prendem o foco, os menus não respondem às setas e só dá para reordenar a checklist com o rato ou o dedo. | M |
-| 11 | **Dias no lixo configuráveis** (`TRASH_DAYS`) | Os 30 dias estão fixos no código. | P |
-| 12 | **Cor da barra do sistema igual à da nota aberta** | No telemóvel, a barra de estado fica amarela mesmo com uma nota azul aberta. | P |
+| 1 | **Testar a importação do ColorNote com um backup real** | O formato não é público. A importação só foi testada com ficheiros gerados no mesmo formato. As mensagens de erro dizem em que passo um backup falha. | P |
+| 2 | **Experimentar os lembretes num telemóvel real e o guia do Home Assistant numa instalação real** | As notificações foram testadas no Chromium (encriptação conforme o RFC 8291), mas não num Android ou iPhone com o serviço de push real. Os exemplos do Home Assistant seguem a documentação, mas ainda não correram numa instalação. | P |
+| 3 | **Atualizar as versões principais quando fizer sentido** | Os PRs do Dependabot com versões principais foram fechados. O Node 24 é LTS até 2028; o TypeScript 7 espera pelo suporte do `svelte-check`. | P |
 
-## Depois — funcionalidades maiores (1.3+)
+## Próximo — uso do dia a dia (1.3)
 
 | # | O quê | Porquê | Esforço |
 |---|---|---|---|
-| 13 | **Lembretes com notificação** | É a maior funcionalidade do ColorNote que falta. Numa PWA exige Web Push enviado pelo servidor, com chaves VAPID e permissão de notificações. | G |
-| 14 | **Interface em inglês** (e outras línguas) | A interface só existe em português. Num projeto público, a língua seguiria a do browser. | M |
-| 15 | **Backups fora do servidor** (WebDAV, S3 ou uma pasta sincronizada) | Hoje os backups ficam no mesmo disco que a base de dados: se o disco falhar, perde-se tudo. | M |
-| 16 | **Mudar a password e terminar outras sessões a partir da app** | Hoje a password só se muda na variável de ambiente, o que termina todas as sessões. | M |
-| 17 | **Imagens nas notas** | Fotos de recibos, quadros ou receitas. Exige guardar ficheiros, sincronizá-los e incluí-los nos backups. | G |
-| 18 | **Formatação simples** (negrito, listas com marcadores) | Só se for possível sem complicar o editor. | M |
-| 19 | **`TRUST_PROXY` configurável** | O limite de tentativas de login confia no cabeçalho do Caddy. Uma opção explícita protege quem expuser a porta diretamente. | P |
+| 4 | **Rever a app com um leitor de ecrã** | Os diálogos já prendem o foco, os menus usam as setas e notas e itens movem-se com `Alt`+setas; falta experimentar com o TalkBack e o NVDA e corrigir o que for anunciado mal. | P–M |
+
+## Integrações
+
+| # | O quê | Porquê | Esforço |
+|---|---|---|---|
+| 5 | **Checklists como listas de tarefas do Home Assistant** (integração *todo*) | Verias e marcarias a lista de compras no painel do Home Assistant. Exige uma integração própria em Python; a API para isso já existe. | G |
+
+## Depois — funcionalidades maiores (1.4+)
+
+| # | O quê | Porquê | Esforço |
+|---|---|---|---|
+| 6 | **Vista de calendário em grelha (mês)** | A vista Lembretes já agrupa por dia; uma grelha do mês ajudaria a ver a semana ou o mês de relance. | M |
+| 7 | **Mais línguas** | A interface já existe em português e inglês; outra língua é só um dicionário novo (`web/src/lib/i18n-en.ts` serve de modelo). | P |
+| 8 | **Mudar a password a partir da app** | Hoje só se muda na variável de ambiente. Terminar a sessão nos outros dispositivos já é possível no menu. | M |
+| 9 | **Bloquear notas com PIN** | Esconde notas sensíveis de quem pega no telemóvel. É só um bloqueio visual, não encripta os dados. | M |
+| 10 | **Imagens nas notas** | Fotos de recibos, quadros ou receitas. Exige guardar ficheiros, sincronizá-los e incluí-los nos backups. | G |
+| 11 | **Formatação simples** (negrito, listas com marcadores) | Só se for possível sem complicar o editor. | M |
 
 ## Fora do âmbito (por agora)
 

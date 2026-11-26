@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Store } from '../src/db.ts';
+import { validateNote } from '../src/notes.ts';
 import { makeNote } from './helpers.ts';
 
 test('last write wins', () => {
@@ -90,4 +91,21 @@ test('purging the trash removes old trashed notes and their history', () => {
   assert.deepEqual(store.purgeTrash(1000), ['a']);
   assert.equal(store.versions('a').length, 0);
   assert.deepEqual(store.all().map((n) => n.id).sort(), ['b', 'c']);
+});
+
+test('checklist sub-items keep their indent, other values are dropped', () => {
+  const note = validateNote(
+    makeNote({
+      type: 'checklist',
+      items: [
+        { id: 'a', text: 'Talho', done: false },
+        { id: 'b', text: 'Frango', done: false, indent: 1 },
+        { id: 'c', text: 'x', done: false, indent: 7 as unknown as 1 },
+      ],
+    }),
+  );
+  assert.deepEqual(
+    note.items.map((i) => i.indent),
+    [undefined, 1, undefined],
+  );
 });

@@ -1,7 +1,8 @@
 <script lang="ts">
+  import { t } from '../lib/i18n';
   import { highlight } from '../lib/highlight';
   import type { Note } from '../lib/types';
-  import { formatShort, normalize } from '../lib/util';
+  import { formatReminder, formatShort, normalize } from '../lib/util';
   import Icon from './Icon.svelte';
 
   let {
@@ -11,8 +12,12 @@
     selecting = false,
     selected = false,
     warning = '',
+    reorderable = false,
+    dragging = false,
     onopen,
     onselect,
+    ondragstart,
+    onmove,
   }: {
     note: Note;
     compact?: boolean;
@@ -20,8 +25,13 @@
     selecting?: boolean;
     selected?: boolean;
     warning?: string;
+    /** Manual order: show a handle to drag the card, and move it with Alt + arrows. */
+    reorderable?: boolean;
+    dragging?: boolean;
     onopen: () => void;
     onselect: () => void;
+    ondragstart?: (e: PointerEvent) => void;
+    onmove?: (by: -1 | 1) => void;
   } = $props();
 
   const maxItems = $derived(compact ? 3 : 8);
@@ -78,6 +88,14 @@
     else onopen();
   }
 
+  function onkeydown(e: KeyboardEvent) {
+    if (!reorderable || !e.altKey) return;
+    const by = e.key === 'ArrowUp' || e.key === 'ArrowLeft' ? -1 : e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 1 : 0;
+    if (!by) return;
+    e.preventDefault();
+    onmove?.(by);
+  }
+
   function oncontextmenu(e: MouseEvent) {
     e.preventDefault();
     clearTimeout(pressTimer);
@@ -92,6 +110,9 @@
   class="card"
   class:compact
   class:selected
+  class:dragging
+  class:reorderable={reorderable && !selecting}
+  data-note={note.id}
   style:--note="var(--note-{note.color})"
   aria-pressed={selecting ? selected : undefined}
   {onclick}
@@ -100,21 +121,35 @@
   onpointerup={cancelPress}
   onpointercancel={cancelPress}
   onpointerleave={cancelPress}
+  {onkeydown}
   {oncontextmenu}>
+  {#if reorderable && !selecting}
+    <span
+      class="grip"
+      title={t('Arrastar para mudar a ordem')}
+      aria-hidden="true"
+      onpointerdown={(e) => {
+        e.stopPropagation();
+        ondragstart?.(e);
+      }}
+      onclick={(e) => e.stopPropagation()}>
+      <Icon name="grip" size={16} />
+    </span>
+  {/if}
   {#if selecting}
     <span class="tick" aria-hidden="true"><Icon name={selected ? 'boxChecked' : 'box'} size={20} /></span>
   {/if}
   {#if note.title || note.pinned}
     <div class="head">
       {#if note.title}<h3>{@render marked(note.title)}</h3>{/if}
-      {#if note.pinned && !selecting}<span class="pin" title="Fixada"><Icon name="pin" size={16} /></span>{/if}
+      {#if note.pinned && !selecting}<span class="pin" title={t('Fixada')}><Icon name="pin" size={16} /></span>{/if}
     </div>
   {/if}
 
   {#if note.type === 'checklist'}
     <ul>
       {#each shown as item (item.id)}
-        <li class:done={item.done}>
+        <li class:done={item.done} class:sub={item.indent === 1}>
           <Icon name={item.done ? 'boxChecked' : 'box'} size={16} />
           <span>{@render marked(item.text)}</span>
         </li>
@@ -122,7 +157,7 @@
     </ul>
     {#if note.items.length > shown.length || doneCount}
       <p class="meta">
-        {#if note.items.length > shown.length}+{note.items.length - shown.length} itens · {/if}{doneCount}/{note.items.length}
+        {#if note.items.length > shown.length}{t('+{n} itens', { n: note.items.length - shown.length })} · {/if}{doneCount}/{note.items.length}
       </p>
     {/if}
   {:else if note.content}
@@ -130,11 +165,17 @@
   {/if}
 
   {#if !note.title && !note.content && !note.items.length}
-    <p class="text empty">Nota vazia</p>
+    <p class="text empty">{t('Nota vazia')}</p>
   {/if}
 
   <span class="date">
-    {#if warning}<span class="warn" title={warning}><Icon name="warning" size={14} /> Não sincronizada</span>{/if}
+    {#if note.reminder_at != null && note.deleted_at == null}
+      <span class="reminder" class:past={note.reminder_at < Date.now()} title={t('Lembrete')}>
+        <Icon name="bell" size={14} />
+        {formatReminder(note.reminder_at)}
+      </span>
+    {/if}
+    {#if warning}<span class="warn" title={warning}><Icon name="warning" size={14} /> {t('Não sincronizada')}</span>{/if}
     {formatShort(note.updated_at)}
   </span>
 </button>
@@ -157,6 +198,49 @@
     border: 1px solid var(--border);
     overflow: hidden;
     transition: transform 0.12s ease;
+  }
+
+  .reminder {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    margin-right: 6px;
+    padding: 1px 7px 1px 5px;
+    border-radius: 999px;
+    background: color-mix(in srgb, currentColor 10%, transparent);
+    font-weight: 600;
+  }
+
+  .reminder.past {
+    opacity: 0.6;
+    text-decoration: line-through;
+  }
+
+  .card.reorderable {
+    padding-left: 20px;
+  }
+
+  .card.dragging {
+    opacity: 0.6;
+    transform: scale(0.97);
+  }
+
+  .grip {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 18px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    opacity: 0.35;
+    cursor: grab;
+    touch-action: none;
+  }
+
+  .grip:hover {
+    opacity: 0.8;
   }
 
   .card.selected {
@@ -246,6 +330,10 @@
     display: flex;
     gap: 6px;
     align-items: flex-start;
+  }
+
+  li.sub {
+    padding-left: 18px;
   }
 
   li :global(svg) {

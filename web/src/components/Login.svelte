@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../lib/i18n';
   import { store } from '../lib/store.svelte';
 
   let password = $state('');
@@ -29,7 +30,7 @@
       autofocus
       bind:value={password} />
     {#if error}<p class="error" role="alert">{error}</p>{/if}
-    <button class="btn" type="submit" disabled={busy}>{busy ? 'A entrar…' : 'Entrar'}</button>
+    <button class="btn" type="submit" disabled={busy}>{busy ? t('A entrar…') : t('Entrar')}</button>
   </form>
 </main>
 

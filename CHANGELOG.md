@@ -3,6 +3,37 @@
 Todas as alterações relevantes do Anotado. O formato segue [Keep a Changelog](https://keepachangelog.com/pt-PT/1.1.0/)
 e as versões seguem [Semantic Versioning](https://semver.org/lang/pt-PT/).
 
+## [1.2.0] - 2026-11-26
+
+### Added
+- **Lembretes com notificação**: o sino no editor define um lembrete (atalhos como "Amanhã às 9:00" ou uma data à escolha). Na hora, o servidor envia uma notificação Web Push a todos os dispositivos com notificações ativas, mesmo com a app fechada, e tocar nela abre a nota. Com a app aberta, aparece também um aviso. Menu → Lembretes mostra as notas com lembrete agrupadas por dia. As notificações ativam-se, desligam-se e testam-se em Servidor e backups. Sem dependências novas: a encriptação e o VAPID usam o `crypto` do Node.
+- **Nomes para as cores** (Menu → Nomes das cores): por exemplo, verde = "Compras". Aparecem no filtro e ao escolher a cor, e são partilhados por todos os dispositivos.
+- **Checklists**: "Desmarcar tudo" e "Apagar concluídos" (com Anular) no menu da nota, e os itens concluídos podem ser recolhidos num toque.
+- **Sub-itens nas checklists**: `Tab` num item torna-o sub-item do de cima (`Shift`+`Tab` desfaz); no telemóvel, arrasta-o pela pega para a direita ou para a esquerda. Aparecem indentados no cartão, no Markdown e na impressão.
+- **Modelos de notas**: Mais opções → Guardar como modelo; as notas novas a partir de um modelo saem do botão +, com os itens por marcar. Gerir modelos no mesmo menu.
+- **Servidor e backups** (Menu): número de notas, espaço ocupado, versão, e a lista dos backups diários, que se podem descarregar ou restaurar. Restaurar repõe as notas como estavam nesse dia; a versão atual de cada nota fica no histórico.
+- **Automações**: com `ANOTADO_API_TOKEN`, o Home Assistant, os Atalhos do iPhone ou o Tasker podem criar notas (`POST /api/notes`) e acrescentar itens a uma checklist pelo nome (`POST /api/lists/items`). Guia em `docs/automacoes.md`, com exemplos para o Home Assistant, incluindo voz com o Assist.
+- **Aviso de versão nova** no menu: o servidor consulta uma vez por dia a última release no GitHub (`UPDATE_CHECK=false` desliga).
+- **Ordem manual das notas**: Ordenar → Manual (arrastar). Arrasta uma nota pela pega à esquerda, ou move-a com `Alt` + setas. A ordem é partilhada pelos dispositivos.
+- **Terminar sessão nos outros dispositivos** (Menu), por exemplo depois de perder o telemóvel. Este dispositivo continua com sessão, e as alterações por sincronizar nos outros não se perdem: são enviadas depois de voltarem a entrar.
+- Exportar uma nota em Markdown e imprimi-la (também com `Ctrl`+`P`).
+- Tamanho da letra (pequeno, normal, grande), no menu.
+- Atalhos de teclado: `?` mostra a lista, `Ctrl`+`Enter` fecha a nota, `Alt`+`↑`/`↓` move um item da checklist e `Ctrl`+`Espaço` marca-o.
+- **Backups fora do servidor**: `BACKUP_WEBDAV_URL` (com `BACKUP_WEBDAV_USER` e `BACKUP_WEBDAV_PASSWORD`) copia cada backup diário para uma pasta WebDAV, como o Nextcloud ou um NAS, e `BACKUP_DIR` muda a pasta dos backups. O estado da cópia aparece em Servidor e backups.
+- `TRASH_DAYS` define quantos dias as notas ficam no lixo (por omissão 30).
+- `TRUST_PROXY=false` faz o limite de tentativas de login ignorar `X-Forwarded-For`, para quem expõe a porta sem proxy.
+- **Interface em inglês**: a língua segue a do browser e pode ser escolhida no menu (Automático, Português, English). As datas e os números seguem a língua. O `npm run check` falha se algum texto ficar sem tradução.
+- README em inglês, com capturas de ecrã.
+
+### Changed
+- No telemóvel, a barra de estado fica com a cor da nota aberta.
+- Os diálogos mantêm o foco do teclado lá dentro e devolvem-no ao fechar, e os menus navegam-se com as setas.
+- O `App.svelte` foi dividido (barra de seleção, menu e diálogos em componentes próprios).
+- O CI volta a correr os testes end-to-end no `ubuntu-latest`, com o Playwright 1.65.
+
+### Fixed
+- Uma nota criada ou apagada noutro dispositivo durante uma sincronização completa podia desaparecer (ou voltar) até à sincronização seguinte.
+
 ## [1.1.3] - 2026-11-23
 
 ### Fixed
