@@ -81,15 +81,18 @@ test('creates text and checklist notes from a simple body', async () => {
 test('settings are validated, stored and shared', async () => {
   const { call, json, login } = setup();
   await login();
-  assert.deepEqual(await (await call('/api/settings')).json(), { color_names: {}, templates: [] });
+  assert.deepEqual(await (await call('/api/settings')).json(), { color_names: {}, templates: [], order: [] });
   const template = { id: 't1', name: 'Mala', type: 'checklist', title: 'Mala', items: ['Escova'], color: 'blue', content: 'x' };
   const res = await json('/api/settings', 'PUT', { color_names: { green: ' Compras ', blue: '' }, templates: [template] });
-  const expected = { color_names: { green: 'Compras' }, templates: [{ ...template, content: '' }] };
+  const expected = { color_names: { green: 'Compras' }, templates: [{ ...template, content: '' }], order: [] };
   assert.deepEqual(await res.json(), expected);
   assert.deepEqual(await (await call('/api/settings')).json(), expected);
   // Older clients send no templates.
-  assert.deepEqual(await (await json('/api/settings', 'PUT', { color_names: {} })).json(), { color_names: {}, templates: [] });
+  assert.deepEqual(await (await json('/api/settings', 'PUT', { color_names: {} })).json(), { color_names: {}, templates: [], order: [] });
   assert.equal((await json('/api/settings', 'PUT', { color_names: { teal: 'x' } })).status, 400);
+  const ordered = await (await json('/api/settings', 'PUT', { color_names: {}, order: ['b', 'a', 'b'] })).json();
+  assert.deepEqual(ordered.order, ['b', 'a']);
+  assert.equal((await json('/api/settings', 'PUT', { color_names: {}, order: ['../x'] })).status, 400);
   assert.equal((await json('/api/settings', 'PUT', { color_names: {}, templates: [{ ...template, name: ' ' }] })).status, 400);
 });
 

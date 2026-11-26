@@ -116,11 +116,13 @@
   function startDrag(e: PointerEvent, item: ChecklistItem) {
     if (readonly) return;
     e.preventDefault();
-    const handle = e.currentTarget as HTMLElement;
-    handle.setPointerCapture(e.pointerId);
+    // Listen on the window: moving the row in the page would drop a pointer capture on its handle,
+    // and the end of the drag (which saves the new order) would never arrive.
+    const pointer = e.pointerId;
     dragId = item.id;
 
     const move = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointer) return;
       for (const row of listEl.querySelectorAll<HTMLElement>('[data-row]')) {
         const rect = row.getBoundingClientRect();
         if (ev.clientY < rect.top || ev.clientY > rect.bottom) continue;
@@ -133,16 +135,17 @@
         break;
       }
     };
-    const end = () => {
+    const end = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointer) return;
       dragId = null;
-      handle.removeEventListener('pointermove', move);
-      handle.removeEventListener('pointerup', end);
-      handle.removeEventListener('pointercancel', end);
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', end);
+      window.removeEventListener('pointercancel', end);
       onchange();
     };
-    handle.addEventListener('pointermove', move);
-    handle.addEventListener('pointerup', end);
-    handle.addEventListener('pointercancel', end);
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
   }
 </script>
 

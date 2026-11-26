@@ -27,8 +27,23 @@
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
+        e.stopPropagation();
         close();
+        root.querySelector<HTMLElement>('button')?.focus();
+        return;
       }
+      // Arrow keys move between the menu's options.
+      if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return;
+      const options = [...root.querySelectorAll<HTMLElement>('.panel button:not([disabled]), .panel a[href]')];
+      if (!options.length || !root.contains(document.activeElement)) return;
+      e.preventDefault();
+      const at = options.indexOf(document.activeElement as HTMLElement);
+      const next =
+        e.key === 'Home' ? 0
+        : e.key === 'End' ? options.length - 1
+        : e.key === 'ArrowDown' ? (at + 1) % options.length
+        : (at <= 0 ? options.length : at) - 1;
+      options[next].focus();
     };
     document.addEventListener('pointerdown', onDown, true);
     document.addEventListener('keydown', onKey, true);

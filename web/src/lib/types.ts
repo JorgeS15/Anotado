@@ -61,7 +61,7 @@ export interface ColorNotePreview {
 }
 
 export type View = 'notes' | 'archive' | 'trash';
-export type SortMode = 'updated' | 'created' | 'color' | 'title';
+export type SortMode = 'updated' | 'created' | 'color' | 'title' | 'manual';
 export type Layout = 'grid' | 'list';
 export type Theme = 'auto' | 'light' | 'dark';
 
@@ -79,6 +79,8 @@ export interface Settings {
   /** A name for each colour, e.g. green = "Compras". */
   color_names: Partial<Record<Color, string>>;
   templates: Template[];
+  /** Note ids in the order chosen by hand. */
+  order: string[];
 }
 
 export interface BackupInfo {

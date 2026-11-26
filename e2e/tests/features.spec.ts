@@ -158,3 +158,62 @@ test('a checklist saved as a template creates new lists with the items unticked'
   await page.click('[aria-label="Apagar modelo Mala"]');
   await expect(page.locator('.sheet')).toContainText('Ainda não tens modelos');
 });
+
+test('manual order: drag a note or move it with Alt+arrows, on every device', async ({ page, browser }) => {
+  await login(page);
+  const names = ['Ordem A', 'Ordem B', 'Ordem C'];
+  for (const name of names) {
+    await page.click('.fab-btn');
+    await page.click('.fab >> text=Texto');
+    await page.fill('.editor .title', name);
+    await page.fill('.editor .content', 'x');
+    await page.keyboard.press('Escape');
+  }
+  await page.fill('.search input', '');
+  await page.click('button[title="Ordenar"]');
+  await page.click('.panel >> text=Manual');
+  const order = async (p = page) =>
+    (await p.locator('.card h3').allTextContents()).filter((t) => t.startsWith('Ordem '));
+  // New notes come first, newest first.
+  expect(await order()).toEqual(['Ordem C', 'Ordem B', 'Ordem A']);
+
+  // Drag C onto B: it goes after B.
+  const grip = card(page, 'Ordem C').locator('.grip');
+  const from = (await grip.boundingBox())!;
+  const to = (await card(page, 'Ordem B').boundingBox())!;
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(order).toEqual(['Ordem B', 'Ordem C', 'Ordem A']);
+
+  await card(page, 'Ordem A').focus();
+  await page.keyboard.press('Alt+ArrowLeft');
+  await page.keyboard.press('Alt+ArrowLeft');
+  await expect.poll(order).toEqual(['Ordem A', 'Ordem B', 'Ordem C']);
+
+  // The order is shared; the other device sorts by hand too once it picks "Manual".
+  const pc = await newDevice(browser);
+  await pc.page.click('button[title="Ordenar"]');
+  await pc.page.click('.panel >> text=Manual');
+  await expect.poll(() => order(pc.page)).toEqual(['Ordem A', 'Ordem B', 'Ordem C']);
+  await pc.context.close();
+});
+
+test('dragging a checklist item saves the new order', async ({ page, browser }) => {
+  await login(page);
+  await createChecklist(page, 'Arrastar itens', ['Primeiro', 'Segundo', 'Terceiro']);
+  const grip = page.locator('.editor li', { hasText: '' }).nth(2).locator('.grip');
+  const from = (await grip.boundingBox())!;
+  const to = (await page.locator('.editor li').first().boundingBox())!;
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + from.width / 2, to.y + to.height / 2, { steps: 8 });
+  await page.mouse.up();
+  expect(await itemTexts(page)).toEqual(['Terceiro', 'Primeiro', 'Segundo']);
+  await page.keyboard.press('Escape');
+  const pc = await newDevice(browser);
+  await card(pc.page, 'Arrastar itens').click();
+  expect(await itemTexts(pc.page)).toEqual(['Terceiro', 'Primeiro', 'Segundo']);
+  await pc.context.close();
+});

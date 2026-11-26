@@ -11,8 +11,12 @@
     selecting = false,
     selected = false,
     warning = '',
+    reorderable = false,
+    dragging = false,
     onopen,
     onselect,
+    ondragstart,
+    onmove,
   }: {
     note: Note;
     compact?: boolean;
@@ -20,8 +24,13 @@
     selecting?: boolean;
     selected?: boolean;
     warning?: string;
+    /** Manual order: show a handle to drag the card, and move it with Alt + arrows. */
+    reorderable?: boolean;
+    dragging?: boolean;
     onopen: () => void;
     onselect: () => void;
+    ondragstart?: (e: PointerEvent) => void;
+    onmove?: (by: -1 | 1) => void;
   } = $props();
 
   const maxItems = $derived(compact ? 3 : 8);
@@ -78,6 +87,14 @@
     else onopen();
   }
 
+  function onkeydown(e: KeyboardEvent) {
+    if (!reorderable || !e.altKey) return;
+    const by = e.key === 'ArrowUp' || e.key === 'ArrowLeft' ? -1 : e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 1 : 0;
+    if (!by) return;
+    e.preventDefault();
+    onmove?.(by);
+  }
+
   function oncontextmenu(e: MouseEvent) {
     e.preventDefault();
     clearTimeout(pressTimer);
@@ -92,6 +109,9 @@
   class="card"
   class:compact
   class:selected
+  class:dragging
+  class:reorderable={reorderable && !selecting}
+  data-note={note.id}
   style:--note="var(--note-{note.color})"
   aria-pressed={selecting ? selected : undefined}
   {onclick}
@@ -100,7 +120,21 @@
   onpointerup={cancelPress}
   onpointercancel={cancelPress}
   onpointerleave={cancelPress}
+  {onkeydown}
   {oncontextmenu}>
+  {#if reorderable && !selecting}
+    <span
+      class="grip"
+      title="Arrastar para mudar a ordem"
+      aria-hidden="true"
+      onpointerdown={(e) => {
+        e.stopPropagation();
+        ondragstart?.(e);
+      }}
+      onclick={(e) => e.stopPropagation()}>
+      <Icon name="grip" size={16} />
+    </span>
+  {/if}
   {#if selecting}
     <span class="tick" aria-hidden="true"><Icon name={selected ? 'boxChecked' : 'box'} size={20} /></span>
   {/if}
@@ -157,6 +191,33 @@
     border: 1px solid var(--border);
     overflow: hidden;
     transition: transform 0.12s ease;
+  }
+
+  .card.reorderable {
+    padding-left: 20px;
+  }
+
+  .card.dragging {
+    opacity: 0.6;
+    transform: scale(0.97);
+  }
+
+  .grip {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 18px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    opacity: 0.35;
+    cursor: grab;
+    touch-action: none;
+  }
+
+  .grip:hover {
+    opacity: 0.8;
   }
 
   .card.selected {

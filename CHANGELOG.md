@@ -12,6 +12,7 @@ e as versões seguem [Semantic Versioning](https://semver.org/lang/pt-PT/).
 - **Servidor e backups** (Menu): número de notas, espaço ocupado, versão, e a lista dos backups diários, que se podem descarregar ou restaurar. Restaurar repõe as notas como estavam nesse dia; a versão atual de cada nota fica no histórico.
 - **Automações**: com `ANOTADO_API_TOKEN`, o Home Assistant, os Atalhos do iPhone ou o Tasker podem criar notas (`POST /api/notes`) e acrescentar itens a uma checklist pelo nome (`POST /api/lists/items`). Guia em `docs/automacoes.md`, com exemplos para o Home Assistant, incluindo voz com o Assist.
 - **Aviso de versão nova** no menu: o servidor consulta uma vez por dia a última release no GitHub (`UPDATE_CHECK=false` desliga).
+- **Ordem manual das notas**: Ordenar → Manual (arrastar). Arrasta uma nota pela pega à esquerda, ou move-a com `Alt` + setas. A ordem é partilhada pelos dispositivos.
 - Exportar uma nota em Markdown e imprimi-la (também com `Ctrl`+`P`).
 - Tamanho da letra (pequeno, normal, grande), no menu.
 - Atalhos de teclado: `?` mostra a lista, `Ctrl`+`Enter` fecha a nota, `Alt`+`↑`/`↓` move um item da checklist e `Ctrl`+`Espaço` marca-o.
@@ -21,7 +22,7 @@ e as versões seguem [Semantic Versioning](https://semver.org/lang/pt-PT/).
 
 ### Changed
 - No telemóvel, a barra de estado fica com a cor da nota aberta.
-- Os diálogos mantêm o foco do teclado lá dentro e devolvem-no ao fechar.
+- Os diálogos mantêm o foco do teclado lá dentro e devolvem-no ao fechar, e os menus navegam-se com as setas.
 - O `App.svelte` foi dividido (barra de seleção, menu e diálogos em componentes próprios).
 - O CI volta a correr os testes end-to-end no `ubuntu-latest`, com o Playwright 1.65.
 

@@ -110,9 +110,12 @@ export interface Settings {
   /** A name for each colour, e.g. green = "Compras". Unnamed colours are left out. */
   color_names: Partial<Record<Color, string>>;
   templates: Template[];
+  /** Note ids in the order chosen by hand (sort "Manual"). Notes not listed come first. */
+  order: string[];
 }
 
-export const DEFAULT_SETTINGS: Settings = { color_names: {}, templates: [] };
+export const DEFAULT_SETTINGS: Settings = { color_names: {}, templates: [], order: [] };
+const MAX_ORDER = 20_000;
 const MAX_TEMPLATES = 30;
 
 function validateTemplate(input: unknown, i: number): Template {
@@ -147,5 +150,7 @@ export function validateSettings(input: unknown): Settings {
   const templates = (input as Record<string, unknown>).templates ?? [];
   if (!Array.isArray(templates)) throw new ValidationError('templates must be a list');
   if (templates.length > MAX_TEMPLATES) throw new ValidationError(`at most ${MAX_TEMPLATES} templates`);
-  return { color_names, templates: templates.map(validateTemplate) };
+  const order = (input as Record<string, unknown>).order ?? [];
+  if (!Array.isArray(order) || order.length > MAX_ORDER) throw new ValidationError('order must be a list of note ids');
+  return { color_names, templates: templates.map(validateTemplate), order: [...new Set(order.map(validateId))] };
 }

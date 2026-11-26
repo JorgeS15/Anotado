@@ -61,12 +61,16 @@ function loadSettings(): Settings {
   try {
     const raw = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? 'null');
     if (raw && typeof raw.color_names === 'object') {
-      return { color_names: raw.color_names ?? {}, templates: Array.isArray(raw.templates) ? raw.templates : [] };
+      return {
+        color_names: raw.color_names ?? {},
+        templates: Array.isArray(raw.templates) ? raw.templates : [],
+        order: Array.isArray(raw.order) ? raw.order : [],
+      };
     }
   } catch {
     /* ignore */
   }
-  return { color_names: {}, templates: [] };
+  return { color_names: {}, templates: [], order: [] };
 }
 
 function storeSettings(settings: Settings, pending: boolean) {
@@ -199,7 +203,7 @@ class NoteStore {
     );
     this.notes = {};
     this.rejected = {};
-    this.settings = { color_names: {}, templates: [] };
+    this.settings = { color_names: {}, templates: [], order: [] };
     storeSettings(this.settings, false);
     this.outboxIds.clear();
     this.pending = 0;

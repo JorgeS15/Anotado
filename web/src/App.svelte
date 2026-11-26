@@ -35,6 +35,7 @@
     { value: 'created', label: 'Data de criação' },
     { value: 'color', label: 'Cor' },
     { value: 'title', label: 'Título' },
+    { value: 'manual', label: 'Manual (arrastar)' },
   ];
   const VIEW_TITLES: Record<View, string> = { notes: 'Anotado', archive: 'Arquivo', trash: 'Lixo' };
 
@@ -42,7 +43,7 @@
   let query = $state('');
   let colorFilter = $state<Color | null>(null);
   let layout = $state<Layout>(readPref('layout', ['grid', 'list'], 'grid'));
-  let sort = $state<SortMode>(readPref('sort', ['updated', 'created', 'color', 'title'], 'updated'));
+  let sort = $state<SortMode>(readPref('sort', ['updated', 'created', 'color', 'title', 'manual'], 'updated'));
   let theme = $state<Theme>(readPref('theme', ['auto', 'light', 'dark'], 'auto'));
   let fontSize = $state<FontSize>(readPref('font-size', ['small', 'normal', 'large'], 'normal'));
 
@@ -102,16 +103,79 @@
       if (q && !searchText(n).includes(q)) return false;
       return true;
     });
+    // Manual order: notes not placed by hand yet come first, newest first.
+    const rank = new Map((dragging?.order ?? store.settings.order).map((id, i) => [id, i]));
     const label = (n: Note) => (n.title || n.content || n.items[0]?.text || '').trim();
     const compare: Record<SortMode, (a: Note, b: Note) => number> = {
       updated: (a, b) => b.updated_at - a.updated_at,
       created: (a, b) => b.created_at - a.created_at,
       color: (a, b) => COLORS.indexOf(a.color) - COLORS.indexOf(b.color) || b.updated_at - a.updated_at,
       title: (a, b) => label(a).localeCompare(label(b), 'pt', { sensitivity: 'base' }),
+      manual: (a, b) => (rank.get(a.id) ?? -1) - (rank.get(b.id) ?? -1) || b.updated_at - a.updated_at,
     };
     if (view === 'trash') return list.sort((a, b) => (b.deleted_at ?? 0) - (a.deleted_at ?? 0));
     return list.sort((a, b) => Number(b.pinned) - Number(a.pinned) || compare[sort](a, b));
   });
+  // --- Manual order -------------------------------------------------------------
+
+  let dragging = $state<{ id: string; order: string[] } | null>(null);
+  const reorderable = $derived(sort === 'manual' && view !== 'trash' && !query.trim());
+
+  /** The full order with the visible notes as they are on screen, keeping hidden ones after them. */
+  function currentOrder(): string[] {
+    const shown = visible.map((n) => n.id);
+    const set = new Set(shown);
+    return [...shown, ...store.settings.order.filter((id) => !set.has(id) && store.notes[id])];
+  }
+
+  function saveOrder(order: string[]) {
+    store.saveSettings({ ...$state.snapshot(store.settings), order: order.filter((id) => store.notes[id]) });
+  }
+
+  function moveNote(id: string, by: -1 | 1) {
+    const list = visible.filter((n) => n.pinned === store.notes[id]?.pinned).map((n) => n.id);
+    const target = list[list.indexOf(id) + by];
+    if (!target) return;
+    const order = currentOrder();
+    order.splice(order.indexOf(id), 1);
+    order.splice(order.indexOf(target) + (by > 0 ? 1 : 0), 0, id);
+    saveOrder(order);
+    requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-note="${id}"]`)?.focus());
+  }
+
+  function startDrag(e: PointerEvent, id: string) {
+    e.preventDefault();
+    // Listen on the window: moving the card in the page would drop a pointer capture on its handle.
+    const pointer = e.pointerId;
+    dragging = { id, order: currentOrder() };
+    const pinnedGroup = store.notes[id]?.pinned;
+
+    const move = (ev: PointerEvent) => {
+      if (!dragging || ev.pointerId !== pointer) return;
+      ev.preventDefault();
+      const over = document.elementFromPoint(ev.clientX, ev.clientY)?.closest<HTMLElement>('[data-note]');
+      const target = over?.dataset.note;
+      if (!target || target === id || store.notes[target]?.pinned !== pinnedGroup) return;
+      const order = dragging.order.filter((x) => x !== id);
+      const to = order.indexOf(target);
+      const from = dragging.order.indexOf(id);
+      // Dropping on a later card puts the note after it, on an earlier one before it.
+      order.splice(to + (from <= dragging.order.indexOf(target) ? 1 : 0), 0, id);
+      dragging = { id, order };
+    };
+    const end = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointer) return;
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', end);
+      window.removeEventListener('pointercancel', end);
+      if (dragging) saveOrder(dragging.order);
+      dragging = null;
+    };
+    window.addEventListener('pointermove', move, { passive: false });
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
+  }
+
   const pinned = $derived(view === 'trash' ? [] : visible.filter((n) => n.pinned));
   const others = $derived(view === 'trash' ? visible : visible.filter((n) => !n.pinned));
 
@@ -424,6 +488,22 @@
     </button>
   </div>
 
+  {#snippet noteCard(note: Note)}
+    <NoteCard
+      {note}
+      {query}
+      compact={layout === 'list'}
+      selecting={selectMode}
+      selected={selected.has(note.id)}
+      warning={store.rejected[note.id]}
+      {reorderable}
+      dragging={dragging?.id === note.id}
+      onopen={() => openNote(note.id)}
+      onselect={() => toggleSelect(note.id)}
+      ondragstart={(e) => startDrag(e, note.id)}
+      onmove={(by) => moveNote(note.id, by)} />
+  {/snippet}
+
   <main>
     {#if view === 'trash' && counts.trash}
       <div class="trash-bar">
@@ -450,30 +530,14 @@
       <h2>Fixadas</h2>
       <div class="notes {layout}">
         {#each pinned as note (note.id)}
-          <NoteCard
-            {note}
-            {query}
-            compact={layout === 'list'}
-            selecting={selectMode}
-            selected={selected.has(note.id)}
-            onopen={() => openNote(note.id)}
-            warning={store.rejected[note.id]}
-            onselect={() => toggleSelect(note.id)} />
+          {@render noteCard(note)}
         {/each}
       </div>
       {#if others.length}<h2>Outras</h2>{/if}
     {/if}
     <div class="notes {layout}">
       {#each others as note (note.id)}
-        <NoteCard
-            {note}
-            {query}
-            compact={layout === 'list'}
-            selecting={selectMode}
-            selected={selected.has(note.id)}
-            onopen={() => openNote(note.id)}
-            warning={store.rejected[note.id]}
-            onselect={() => toggleSelect(note.id)} />
+        {@render noteCard(note)}
       {/each}
     </div>
   </main>
