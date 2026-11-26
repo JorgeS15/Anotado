@@ -5,7 +5,18 @@
   import { store } from '../lib/store.svelte';
   import type { Color, Note } from '../lib/types';
   import { LIMITS, formatCount } from '../lib/limits';
-  import { findLinks, formatFull, isEmpty, itemsToText, textToItems, uid } from '../lib/util';
+  import { download, fileName, printNote, toMarkdown } from '../lib/export';
+  import { trapFocus } from '../lib/focus';
+  import {
+    findLinks,
+    formatFull,
+    hiddenDone,
+    isEmpty,
+    itemsToText,
+    setHiddenDone,
+    textToItems,
+    uid,
+  } from '../lib/util';
   import Checklist from './Checklist.svelte';
   import History from './History.svelte';
   import ColorPicker from './ColorPicker.svelte';
@@ -40,6 +51,13 @@
   let colorOpen = $state(false);
   let moreOpen = $state(false);
   let historyOpen = $state(false);
+  // svelte-ignore state_referenced_locally
+  let hideDone = $state(hiddenDone().has(id));
+  let dialogEl = $state<HTMLElement>();
+  const doneCount = $derived(note?.items.filter((i) => i.done).length ?? 0);
+
+  // Keep Tab inside the note; Escape is handled by the app (it also updates the history).
+  $effect(() => (dialogEl ? trapFocus(dialogEl) : undefined));
 
   onMount(async () => {
     if (!draft) return;
@@ -137,6 +155,48 @@
     notify('Nota apagada');
   }
 
+  function toggleHidden() {
+    hideDone = !hideDone;
+    setHiddenDone(id, hideDone);
+  }
+
+  function uncheckAll() {
+    if (!note) return;
+    const before = note.items.map((i) => i.done);
+    for (const item of note.items) item.done = false;
+    changed();
+    const noteId = id;
+    notify('Itens desmarcados', () => {
+      const n = store.notes[noteId];
+      if (n) store.update(noteId, { items: n.items.map((item, i) => ({ ...item, done: before[i] ?? item.done })) });
+    });
+  }
+
+  function removeDone() {
+    if (!note) return;
+    const before = $state.snapshot(note.items);
+    note.items = note.items.filter((i) => !i.done);
+    changed();
+    const noteId = id;
+    notify(`${before.length - note.items.length} itens apagados`, () => store.update(noteId, { items: before }));
+  }
+
+  function exportMarkdown() {
+    if (!note) return;
+    download(fileName(note, 'md'), toMarkdown(note));
+  }
+
+  function print() {
+    if (note) printNote($state.snapshot(note) as Note);
+  }
+
+  function onkeydown(e: KeyboardEvent) {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
+      e.preventDefault();
+      print();
+    }
+  }
+
   function asText(n: Note) {
     const body =
       n.type === 'checklist' ? n.items.map((i) => `${i.done ? '☑' : '☐'} ${i.text}`).join('\n') : n.content;
@@ -191,7 +251,15 @@
 
 {#if note}
   <div class="backdrop" role="presentation" onclick={(e) => e.target === e.currentTarget && onclose()}>
-    <div class="editor scroll" style:--note="var(--note-{note.color})" role="dialog" aria-label="Editar nota">
+    <div
+      class="editor scroll"
+      style:--note="var(--note-{note.color})"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Editar nota"
+      tabindex="-1"
+      bind:this={dialogEl}
+      {onkeydown}>
       <header>
         <button class="icon-btn" onclick={onclose} aria-label="Voltar"><Icon name="back" /></button>
         <span class="spacer"></span>
@@ -219,7 +287,18 @@
                 <Icon name={note.type === 'text' ? 'checklist' : 'text'} />
                 {note.type === 'text' ? 'Converter em checklist' : 'Converter em texto'}
               </button>
+              {#if note.type === 'checklist' && doneCount}
+                <button class="item" onclick={() => (close(), uncheckAll())}><Icon name="uncheck" /> Desmarcar tudo</button>
+                <button class="item" onclick={() => (close(), removeDone())}>
+                  <Icon name="broom" /> Apagar concluídos
+                </button>
+                <hr />
+              {/if}
               <button class="item" onclick={() => (close(), share())}><Icon name="share" /> Partilhar</button>
+              <button class="item" onclick={() => (close(), exportMarkdown())}>
+                <Icon name="download" /> Descarregar (.md)
+              </button>
+              <button class="item" onclick={() => (close(), print())}><Icon name="print" /> Imprimir</button>
               <button class="item" onclick={() => (close(), duplicate())}><Icon name="copy" /> Duplicar</button>
               <button class="item" onclick={() => (close(), (historyOpen = true))}>
                 <Icon name="history" /> Histórico
@@ -275,7 +354,12 @@
             </div>
           {/if}
         {:else}
-          <Checklist items={note.items} readonly={trashed} onchange={changed} />
+          <Checklist
+            items={note.items}
+            readonly={trashed}
+            {hideDone}
+            onchange={changed}
+            ontogglehidden={toggleHidden} />
         {/if}
       </div>
 

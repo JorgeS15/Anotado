@@ -64,3 +64,33 @@ export type View = 'notes' | 'archive' | 'trash';
 export type SortMode = 'updated' | 'created' | 'color' | 'title';
 export type Layout = 'grid' | 'list';
 export type Theme = 'auto' | 'light' | 'dark';
+
+export interface Settings {
+  /** A name for each colour, e.g. green = "Compras". */
+  color_names: Partial<Record<Color, string>>;
+}
+
+export interface BackupInfo {
+  name: string;
+  size: number;
+  created_at: number;
+}
+
+export interface UpdateInfo {
+  version: string;
+  url: string;
+}
+
+export interface ServerStatus {
+  version: string;
+  update: UpdateInfo | null;
+  notes: number;
+  archived: number;
+  trashed: number;
+  db_size: number;
+  trash_days: number;
+  api_token: boolean;
+  backups: BackupInfo[];
+}
+
+export type FontSize = 'small' | 'normal' | 'large';

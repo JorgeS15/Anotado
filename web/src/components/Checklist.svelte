@@ -9,8 +9,17 @@
   let {
     items,
     readonly = false,
+    hideDone = false,
     onchange,
-  }: { items: ChecklistItem[]; readonly?: boolean; onchange: () => void } = $props();
+    ontogglehidden,
+  }: {
+    items: ChecklistItem[];
+    readonly?: boolean;
+    /** Collapse the ticked items under their count. */
+    hideDone?: boolean;
+    onchange: () => void;
+    ontogglehidden?: () => void;
+  } = $props();
 
   let listEl: HTMLElement;
   let dragId = $state<string | null>(null);
@@ -49,9 +58,28 @@
     if (focusPrevious && prev) focusItem(prev.id);
   }
 
+  /** Moves an item up or down among the items in its section (open or done). */
+  function move(item: ChecklistItem, by: -1 | 1) {
+    const visible = item.done ? done : open;
+    const target = visible[visible.indexOf(item) + by];
+    if (!target) return;
+    const from = items.indexOf(item);
+    items.splice(from, 1);
+    items.splice(items.indexOf(target) + (by > 0 ? 1 : 0), 0, item);
+    onchange();
+    focusItem(item.id);
+  }
+
   function onkeydown(e: KeyboardEvent, item: ChecklistItem) {
     const el = e.currentTarget as HTMLTextAreaElement;
-    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+    if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+      e.preventDefault();
+      move(item, e.key === 'ArrowUp' ? -1 : 1);
+    } else if ((e.ctrlKey || e.metaKey) && e.key === ' ') {
+      e.preventDefault();
+      toggle(item);
+      focusItem(item.id);
+    } else if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
       // At the item limit a split would drop the text after the cursor.
       if (full) return;
@@ -173,12 +201,21 @@
   {/if}
 
   {#if done.length}
-    <p class="done-label">{done.length} {done.length === 1 ? 'item concluído' : 'itens concluídos'}</p>
-    <ul>
-      {#each done as item (item.id)}
-        {@render row(item)}
-      {/each}
-    </ul>
+    {#if ontogglehidden}
+      <button class="done-label toggle" type="button" aria-expanded={!hideDone} onclick={ontogglehidden}>
+        <span class="chevron" class:closed={hideDone}><Icon name="chevron" size={16} /></span>
+        {done.length} {done.length === 1 ? 'item concluído' : 'itens concluídos'}
+      </button>
+    {:else}
+      <p class="done-label">{done.length} {done.length === 1 ? 'item concluído' : 'itens concluídos'}</p>
+    {/if}
+    {#if !hideDone}
+      <ul>
+        {#each done as item (item.id)}
+          {@render row(item)}
+        {/each}
+      </ul>
+    {/if}
   {/if}
 </div>
 
@@ -275,5 +312,27 @@
     margin: 16px 0 4px 32px;
     font-size: 0.85rem;
     opacity: 0.6;
+  }
+
+  .toggle {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 10px;
+    padding: 4px 6px;
+    border-radius: 8px;
+  }
+
+  .toggle:hover {
+    opacity: 0.85;
+  }
+
+  .chevron {
+    display: inline-flex;
+    transition: transform 0.15s ease;
+  }
+
+  .chevron.closed {
+    transform: rotate(-90deg);
   }
 </style>

@@ -1,20 +1,24 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
+  import AppMenu from './components/AppMenu.svelte';
+  import ColorNames from './components/ColorNames.svelte';
   import ColorNoteImport from './components/ColorNoteImport.svelte';
-  import ColorPicker from './components/ColorPicker.svelte';
   import Editor from './components/Editor.svelte';
   import Icon from './components/Icon.svelte';
   import Login from './components/Login.svelte';
   import NoteCard from './components/NoteCard.svelte';
   import Popover from './components/Popover.svelte';
+  import SelectBar from './components/SelectBar.svelte';
+  import ServerStatus from './components/ServerStatus.svelte';
+  import Shortcuts from './components/Shortcuts.svelte';
   import { now } from './lib/clock';
   import { pwa } from './lib/pwa.svelte';
-  import { store } from './lib/store.svelte';
+  import { colorLabel, store } from './lib/store.svelte';
   import {
     COLORS,
-    COLOR_LABELS,
     type Color,
+    type FontSize,
     type Layout,
     type Note,
     type NoteType,
@@ -30,11 +34,6 @@
     { value: 'color', label: 'Cor' },
     { value: 'title', label: 'Título' },
   ];
-  const THEMES: { value: Theme; label: string }[] = [
-    { value: 'auto', label: 'Automático' },
-    { value: 'light', label: 'Claro' },
-    { value: 'dark', label: 'Escuro' },
-  ];
   const VIEW_TITLES: Record<View, string> = { notes: 'Anotado', archive: 'Arquivo', trash: 'Lixo' };
 
   let view = $state<View>('notes');
@@ -43,20 +42,19 @@
   let layout = $state<Layout>(readPref('layout', ['grid', 'list'], 'grid'));
   let sort = $state<SortMode>(readPref('sort', ['updated', 'created', 'color', 'title'], 'updated'));
   let theme = $state<Theme>(readPref('theme', ['auto', 'light', 'dark'], 'auto'));
+  let fontSize = $state<FontSize>(readPref('font-size', ['small', 'normal', 'large'], 'normal'));
 
   let editing = $state<{ id: string; draft?: Note } | null>(null);
   let editor = $state<ReturnType<typeof Editor>>();
   let toast = $state<{ message: string; undo?: () => void; key: number } | null>(null);
-  let menuOpen = $state(false);
   let sortOpen = $state(false);
   let fabOpen = $state(false);
   let searchEl = $state<HTMLInputElement>();
   let importEl = $state<HTMLInputElement>();
-  let colorNoteOpen = $state(false);
+  let sheet = $state<'colornote' | 'colornames' | 'server' | 'shortcuts' | null>(null);
 
   let selectMode = $state(false);
   const selected = new SvelteSet<string>();
-  let selectColorOpen = $state(false);
 
   /** A note to create from the URL: Android share target or app shortcut. */
   let pendingLaunch: { type: NoteType; title?: string; content?: string } | null = null;
@@ -122,10 +120,28 @@
     else document.documentElement.dataset.theme = theme;
     writePref('theme', theme);
   });
+  $effect(() => {
+    if (fontSize === 'normal') delete document.documentElement.dataset.font;
+    else document.documentElement.dataset.font = fontSize;
+    writePref('font-size', fontSize);
+  });
   $effect(() => writePref('layout', layout));
   $effect(() => writePref('sort', sort));
   $effect(() => {
     document.body.classList.toggle('lock', editing !== null);
+  });
+
+  // The phone's status bar takes the colour of the open note, or of the app.
+  const editingColor = $derived(editing ? (store.notes[editing.id] ?? editing.draft)?.color : undefined);
+  $effect(() => {
+    void theme;
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    if (!meta) return;
+    const css = getComputedStyle(document.documentElement);
+    // Narrow screens show the note full screen; wider ones over the app background.
+    const fullScreen = matchMedia('(max-width: 720px)').matches;
+    const color = editingColor && fullScreen ? css.getPropertyValue(`--note-${editingColor}`) : css.getPropertyValue('--bg');
+    meta.content = color.trim() || '#f6f3ea';
   });
 
   // --- Navigation (the back button closes the editor / leaves a view) -------
@@ -226,37 +242,14 @@
     if (popHistory && history.state?.select) history.back();
   }
 
-  const selectedNotes = $derived([...selected].map((id) => store.notes[id]).filter(Boolean));
-  const allPinned = $derived(selectedNotes.length > 0 && selectedNotes.every((n) => n.pinned));
-
-  function bulk(patch: (n: Note) => Partial<Note>, message: string, undoable = true) {
-    const notes = selectedNotes;
-    const before = notes.map((n) => [n.id, { pinned: n.pinned, archived: n.archived, deleted_at: n.deleted_at, color: n.color }] as const);
-    for (const n of notes) store.update(n.id, patch(n));
-    clearSelection();
-    notify(
-      message.replace('{n}', String(notes.length)),
-      undoable ? () => before.forEach(([id, old]) => store.update(id, old)) : undefined,
-    );
-  }
-
-  function bulkColor(color: Color) {
-    selectColorOpen = false;
-    bulk(() => ({ color }), 'Cor alterada em {n} notas');
-  }
-
-  function bulkDeleteForever() {
-    const ids = [...selected];
-    if (!ids.length || !confirm(`Apagar ${ids.length} ${ids.length === 1 ? 'nota' : 'notas'} para sempre?`)) return;
-    for (const id of ids) store.purge(id);
-    clearSelection();
-    notify('Notas apagadas');
-  }
-
   function onkeydown(e: KeyboardEvent) {
     if (e.defaultPrevented || store.auth !== 'yes') return;
+    if (sheet) return;
     if (editing) {
-      if (e.key === 'Escape') closeEditor();
+      if (e.key === 'Escape' || (e.key === 'Enter' && (e.ctrlKey || e.metaKey))) {
+        e.preventDefault();
+        closeEditor();
+      }
       return;
     }
     if (selectMode) {
@@ -279,6 +272,9 @@
     } else if (e.key === '/') {
       e.preventDefault();
       searchEl?.focus();
+    } else if (e.key === '?') {
+      e.preventDefault();
+      sheet = 'shortcuts';
     }
   }
 
@@ -330,59 +326,7 @@
   <Login />
 {:else}
   {#if selectMode}
-    <header class="top selectbar">
-      <button class="icon-btn" onclick={() => clearSelection()} aria-label="Cancelar seleção"><Icon name="close" /></button>
-      <h1>{selected.size} {selected.size === 1 ? 'selecionada' : 'selecionadas'}</h1>
-      <button
-        class="icon-btn"
-        title="Selecionar todas"
-        onclick={() => visible.forEach((n) => selected.add(n.id))}><Icon name="select" /></button>
-      {#if view === 'trash'}
-        <button
-          class="icon-btn"
-          title="Restaurar"
-          disabled={!selected.size}
-          onclick={() => bulk(() => ({ deleted_at: null }), '{n} notas restauradas', false)}><Icon name="restore" /></button>
-        <button class="icon-btn" title="Apagar para sempre" disabled={!selected.size} onclick={bulkDeleteForever}>
-          <Icon name="trash" />
-        </button>
-      {:else}
-        <button
-          class="icon-btn"
-          title={allPinned ? 'Desafixar' : 'Fixar'}
-          class:active={allPinned}
-          disabled={!selected.size}
-          onclick={() => bulk(() => ({ pinned: !allPinned }), allPinned ? '{n} notas desafixadas' : '{n} notas fixadas')}>
-          <Icon name="pin" />
-        </button>
-        <Popover bind:open={selectColorOpen}>
-          {#snippet trigger(toggle)}
-            <button class="icon-btn" title="Cor" disabled={!selected.size} onclick={toggle}><Icon name="palette" /></button>
-          {/snippet}
-          {#snippet children()}
-            <div class="picker"><ColorPicker value={null} onpick={bulkColor} /></div>
-          {/snippet}
-        </Popover>
-        <button
-          class="icon-btn"
-          title={view === 'archive' ? 'Desarquivar' : 'Arquivar'}
-          disabled={!selected.size}
-          onclick={() =>
-            bulk(
-              () => ({ archived: view !== 'archive' }),
-              view === 'archive' ? '{n} notas desarquivadas' : '{n} notas arquivadas',
-            )}>
-          <Icon name={view === 'archive' ? 'unarchive' : 'archive'} />
-        </button>
-        <button
-          class="icon-btn"
-          title="Mover para o lixo"
-          disabled={!selected.size}
-          onclick={() => bulk(() => ({ deleted_at: now() }), '{n} notas movidas para o lixo')}>
-          <Icon name="trash" />
-        </button>
-      {/if}
-    </header>
+    <SelectBar {view} {selected} {visible} onclear={() => clearSelection()} {notify} />
   {:else}
   <header class="top">
     {#if view === 'notes'}
@@ -412,44 +356,20 @@
       <span class="status syncing" title="A sincronizar…"><Icon name="sync" size={18} /></span>
     {/if}
 
-    <Popover bind:open={menuOpen}>
-      {#snippet trigger(toggle)}
-        <button class="icon-btn" onclick={toggle} aria-label="Menu"><Icon name="more" /></button>
-      {/snippet}
-      {#snippet children(close)}
-        <button class="item" class:selected={view === 'notes'} onclick={() => (close(), goTo('notes'))}>
-          <Icon name="notes" /> Notas
-        </button>
-        <button class="item" class:selected={view === 'archive'} onclick={() => (close(), goTo('archive'))}>
-          <Icon name="archive" /> Arquivo {#if counts.archive}<span class="count">{counts.archive}</span>{/if}
-        </button>
-        <button class="item" class:selected={view === 'trash'} onclick={() => (close(), goTo('trash'))}>
-          <Icon name="trash" /> Lixo {#if counts.trash}<span class="count">{counts.trash}</span>{/if}
-        </button>
-        <hr />
-        <div class="label">Tema</div>
-        {#each THEMES as t (t.value)}
-          <button class="item" class:selected={theme === t.value} onclick={() => (theme = t.value)}>
-            <Icon name={theme === t.value ? 'check' : 'theme'} />
-            {t.label}
-          </button>
-        {/each}
-        <hr />
-        <button class="item" onclick={() => (close(), startSelect())}><Icon name="select" /> Selecionar notas</button>
-        {#if pwa.canInstall}
-          <button class="item" onclick={() => (close(), pwa.install())}><Icon name="download" /> Instalar app</button>
-        {/if}
-        <hr />
-        <button class="item" onclick={() => (close(), exportBackup())}><Icon name="download" /> Exportar backup</button>
-        <button class="item" onclick={() => (close(), importEl?.click())}><Icon name="upload" /> Importar backup</button>
-        <button class="item" onclick={() => (close(), (colorNoteOpen = true))}>
-          <Icon name="colornote" /> Importar do ColorNote
-        </button>
-        <hr />
-        <button class="item" onclick={() => (close(), logout())}><Icon name="logout" /> Terminar sessão</button>
-        <div class="version">Anotado v{__APP_VERSION__}</div>
-      {/snippet}
-    </Popover>
+    <AppMenu
+      {view}
+      {counts}
+      bind:theme
+      bind:fontSize
+      ongo={goTo}
+      onselect={startSelect}
+      onexport={exportBackup}
+      onimport={() => importEl?.click()}
+      oncolornote={() => (sheet = 'colornote')}
+      oncolornames={() => (sheet = 'colornames')}
+      onserver={() => (sheet = 'server')}
+      onshortcuts={() => (sheet = 'shortcuts')}
+      onlogout={logout} />
     <input type="file" accept="application/json,.json" hidden bind:this={importEl} onchange={importBackup} />
   </header>
   {/if}
@@ -469,12 +389,15 @@
           class="dot"
           class:selected={colorFilter === color}
           style:--dot="var(--dot-{color})"
-          title={COLOR_LABELS[color]}
-          aria-label="Filtrar: {COLOR_LABELS[color]}"
+          title={colorLabel(color)}
+          aria-label="Filtrar: {colorLabel(color)}"
           aria-pressed={colorFilter === color}
           onclick={() => (colorFilter = colorFilter === color ? null : color)}></button>
       {/each}
     </div>
+    {#if colorFilter && store.settings.color_names[colorFilter]}
+      <span class="filter-name">{colorLabel(colorFilter)}</span>
+    {/if}
     {#if view !== 'trash'}
       <Popover bind:open={sortOpen}>
         {#snippet trigger(toggle)}
@@ -501,7 +424,7 @@
   <main>
     {#if view === 'trash' && counts.trash}
       <div class="trash-bar">
-        <span>As notas no lixo são apagadas ao fim de 30 dias.</span>
+        <span>As notas no lixo são apagadas ao fim de {store.trashDays} {store.trashDays === 1 ? 'dia' : 'dias'}.</span>
         <button class="btn ghost" onclick={emptyTrash}>Esvaziar lixo</button>
       </div>
     {/if}
@@ -582,8 +505,14 @@
     {/key}
   {/if}
 
-  {#if colorNoteOpen}
-    <ColorNoteImport onclose={() => (colorNoteOpen = false)} {notify} />
+  {#if sheet === 'colornote'}
+    <ColorNoteImport onclose={() => (sheet = null)} {notify} />
+  {:else if sheet === 'colornames'}
+    <ColorNames onclose={() => (sheet = null)} {notify} />
+  {:else if sheet === 'server'}
+    <ServerStatus onclose={() => (sheet = null)} {notify} />
+  {:else if sheet === 'shortcuts'}
+    <Shortcuts onclose={() => (sheet = null)} />
   {/if}
 
   {#if toast}
@@ -607,23 +536,6 @@
     min-height: 100dvh;
   }
 
-  .top {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: max(10px, env(safe-area-inset-top)) 12px 6px 16px;
-    background: var(--bg);
-  }
-
-  .top h1 {
-    margin: 0;
-    font-size: 1.25rem;
-    font-weight: 700;
-    white-space: nowrap;
-  }
 
   .logo {
     flex: none;
@@ -684,40 +596,11 @@
     animation: spin 1.2s linear infinite;
   }
 
-  .selectbar {
-    gap: 0;
-    padding-left: 6px;
-    padding-right: 6px;
-  }
 
-  @media (max-width: 380px) {
-    .selectbar :global(.icon-btn) {
-      width: 36px;
-    }
-  }
 
-  .selectbar h1 {
-    flex: 1;
-    min-width: 0;
-    font-size: 1.05rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
 
-  .picker {
-    padding: 8px;
-  }
 
-  .icon-btn:disabled {
-    opacity: 0.35;
-    cursor: default;
-  }
 
-  .version {
-    padding: 8px 12px 4px;
-    font-size: 0.75rem;
-    color: var(--text-2);
-  }
 
   .update-bar {
     display: flex;
@@ -744,11 +627,6 @@
     font-weight: 600;
   }
 
-  .count {
-    margin-left: auto;
-    font-size: 0.8rem;
-    color: var(--text-2);
-  }
 
   .toolbar {
     display: flex;
@@ -767,6 +645,20 @@
     overflow-x: auto;
     padding: 6px 2px;
     scrollbar-width: none;
+  }
+
+  .filter-name {
+    flex: none;
+    max-width: 40%;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    font-size: 0.85rem;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .dot {

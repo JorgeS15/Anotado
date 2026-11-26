@@ -93,3 +93,23 @@ export function validateNote(input: unknown): Note {
     updated_at,
   };
 }
+
+export interface Settings {
+  /** A name for each colour, e.g. green = "Compras". Unnamed colours are left out. */
+  color_names: Partial<Record<Color, string>>;
+}
+
+export const DEFAULT_SETTINGS: Settings = { color_names: {} };
+
+export function validateSettings(input: unknown): Settings {
+  if (!input || typeof input !== 'object') throw new ValidationError('settings must be an object');
+  const raw = (input as Record<string, unknown>).color_names ?? {};
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new ValidationError('color_names must be an object');
+  const color_names: Settings['color_names'] = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (!COLORS.includes(key as Color)) throw new ValidationError(`unknown colour: ${key}`);
+    const name = str(value, `color_names.${key}`, 40).trim();
+    if (name) color_names[key as Color] = name;
+  }
+  return { color_names };
+}

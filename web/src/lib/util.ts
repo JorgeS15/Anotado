@@ -68,3 +68,26 @@ export function writePref(key: string, value: string): void {
     /* ignore */
   }
 }
+
+const HIDE_DONE_KEY = 'anotado:hide-done';
+
+/** Checklists whose ticked items are collapsed on this device. */
+export function hiddenDone(): Set<string> {
+  try {
+    const ids = JSON.parse(localStorage.getItem(HIDE_DONE_KEY) ?? '[]');
+    return new Set(Array.isArray(ids) ? ids : []);
+  } catch {
+    return new Set();
+  }
+}
+
+export function setHiddenDone(id: string, hidden: boolean): void {
+  const ids = hiddenDone();
+  if (hidden) ids.add(id);
+  else ids.delete(id);
+  try {
+    localStorage.setItem(HIDE_DONE_KEY, JSON.stringify([...ids].slice(-500)));
+  } catch {
+    /* ignore */
+  }
+}

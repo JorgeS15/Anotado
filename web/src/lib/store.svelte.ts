@@ -1,6 +1,6 @@
 import { createStore, del, delMany, entries, set, setMany, values } from 'idb-keyval';
 import { clientId, now, syncClock } from './clock';
-import type { ColorNotePreview, Note, NoteVersion } from './types';
+import { COLOR_LABELS, type Color, type ColorNotePreview, type Note, type NoteVersion, type ServerStatus, type Settings, type UpdateInfo } from './types';
 
 /**
  * Offline-first note store.
@@ -25,6 +25,8 @@ export class HttpError extends Error {
 const notesDb = createStore('anotado-notes', 'notes');
 const outboxDb = createStore('anotado-outbox', 'outbox');
 const AUTH_KEY = 'anotado:authed';
+const SETTINGS_KEY = 'anotado:settings';
+const SETTINGS_PENDING_KEY = 'anotado:settings-pending';
 const SAVE_DELAY = 300;
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
@@ -55,6 +57,34 @@ function rememberAuth(value: boolean) {
   }
 }
 
+function loadSettings(): Settings {
+  try {
+    const raw = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? 'null');
+    if (raw && typeof raw.color_names === 'object') return { color_names: raw.color_names ?? {} };
+  } catch {
+    /* ignore */
+  }
+  return { color_names: {} };
+}
+
+function storeSettings(settings: Settings, pending: boolean) {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    if (pending) localStorage.setItem(SETTINGS_PENDING_KEY, '1');
+    else localStorage.removeItem(SETTINGS_PENDING_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+function settingsPending(): boolean {
+  try {
+    return localStorage.getItem(SETTINGS_PENDING_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
 function hadAuth(): boolean {
   try {
     return localStorage.getItem(AUTH_KEY) === '1';
@@ -71,6 +101,12 @@ class NoteStore {
   loaded = $state(false);
   /** Notes the server refused (e.g. too large), by id. Kept locally and retried until fixed. */
   rejected = $state<Record<string, string>>({});
+  /** Shared by every device: colour names. Edited offline too, and sent on the next sync. */
+  settings = $state<Settings>(loadSettings());
+  /** Days notes stay in the trash, as configured on the server. */
+  trashDays = $state(30);
+  /** A newer release the server knows about. */
+  newVersion = $state<UpdateInfo | null>(null);
 
   /** Bumped on every outbox write, so a finished request knows if it is stale. */
   private versions = new Map<string, number>();
@@ -112,8 +148,13 @@ class NoteStore {
   async checkSession() {
     try {
       const sentAt = Date.now();
-      const { authenticated, now: serverNow } = await api<{ authenticated: boolean; now: number }>('/api/session');
+      const session = await api<{ authenticated: boolean; now: number; trash_days?: number; update?: UpdateInfo | null }>(
+        '/api/session',
+      );
+      const { authenticated, now: serverNow } = session;
       syncClock(serverNow, sentAt, Date.now());
+      if (session.trash_days) this.trashDays = session.trash_days;
+      this.newVersion = session.update ?? null;
       this.online = true;
       this.setAuth(authenticated);
     } catch {
@@ -152,6 +193,8 @@ class NoteStore {
     );
     this.notes = {};
     this.rejected = {};
+    this.settings = { color_names: {} };
+    storeSettings(this.settings, false);
     this.outboxIds.clear();
     this.pending = 0;
     this.setAuth(false);
@@ -237,7 +280,37 @@ class NoteStore {
     this.connectEvents();
     this.persistNow();
     await this.flush();
-    if (this.online) await this.pull();
+    if (this.online) await Promise.all([this.pull(), this.syncSettings()]);
+  }
+
+  // --- Settings ---------------------------------------------------------------
+
+  saveSettings(settings: Settings) {
+    this.settings = settings;
+    storeSettings(settings, true);
+    this.syncSettings();
+  }
+
+  /** Sends local settings changes, or fetches the server's when there are none. */
+  private async syncSettings() {
+    if (this.auth !== 'yes') return;
+    try {
+      const pending = settingsPending();
+      const sent = pending ? $state.snapshot(this.settings) : undefined;
+      const result = await api<Settings>('/api/settings', pending ? { method: 'PUT', body: JSON.stringify(sent) } : undefined);
+      // Keep a change made while the request was running; it is sent next time.
+      if (pending && JSON.stringify($state.snapshot(this.settings)) !== JSON.stringify(sent)) return;
+      this.settings = result;
+      storeSettings(result, false);
+    } catch (err) {
+      if (err instanceof HttpError && err.status === 400) storeSettings(this.settings, false);
+    }
+  }
+
+  private applySettings(settings: Settings) {
+    if (settingsPending()) return;
+    this.settings = settings;
+    storeSettings(settings, false);
   }
 
   /** Pushes the outbox to the server, in order. Safe to call any time. */
@@ -379,6 +452,7 @@ class NoteStore {
         delete this.notes[event.id];
         del(event.id, notesDb).catch(() => {});
       } else if (event.type === 'reload') this.pull();
+      else if (event.type === 'settings') this.applySettings(event.settings);
     });
     source.addEventListener('error', () => {
       if (source.readyState === EventSource.CLOSED) {
@@ -425,6 +499,25 @@ class NoteStore {
     this.applyRemote(res.note, true);
   }
 
+  // --- Server status and backups -------------------------------------------------
+
+  async status(): Promise<ServerStatus> {
+    const status = await api<ServerStatus>('/api/status');
+    this.newVersion = status.update;
+    this.trashDays = status.trash_days;
+    return status;
+  }
+
+  async restoreBackup(name: string): Promise<string> {
+    await this.sync();
+    const res = await api<{ restored: number; total: number }>(`/api/backups/${encodeURIComponent(name)}/restore`, {
+      method: 'POST',
+    });
+    await this.pull();
+    if (!res.restored) return 'As notas já estavam iguais a este backup.';
+    return `${res.restored} ${res.restored === 1 ? 'nota restaurada' : 'notas restauradas'} do backup.`;
+  }
+
   // --- Backup -----------------------------------------------------------------
 
   async previewColorNote(file: File, password: string): Promise<ColorNotePreview> {
@@ -468,3 +561,8 @@ class NoteStore {
 }
 
 export const store = new NoteStore();
+
+/** The user's name for a colour, or its plain name. */
+export function colorLabel(color: Color): string {
+  return store.settings.color_names[color] || COLOR_LABELS[color];
+}

@@ -36,6 +36,12 @@ export const ICONS = {
   select: '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12l3 3 5-6"/>',
   update: '<path d="M21 12a9 9 0 1 1-2.6-6.4L21 8M21 3v5h-5"/>',
   colornote: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 3v18M11 8h6M11 12h6M11 16h4"/>',
+  server: '<rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/>',
+  keyboard: '<rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/>',
+  print: '<path d="M7 9V3h10v6M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/><rect x="7" y="14" width="10" height="7" rx="1"/>',
+  uncheck: '<rect x="4" y="4" width="16" height="16" rx="3.5"/><path d="M9 9l6 6M15 9l-6 6"/>',
+  broom: '<path d="M14 4l6 6M4 20l7.5-7.5M9 11l4 4-3 5H4v-6z"/>',
+  chevron: '<path d="M6 9l6 6 6-6"/>',
 } as const;
 
 export type IconName = keyof typeof ICONS;

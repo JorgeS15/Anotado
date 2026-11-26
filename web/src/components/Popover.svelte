@@ -59,6 +59,9 @@
     right: 0;
     z-index: 50;
     min-width: 220px;
+    max-height: calc(100dvh - 90px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
     padding: 6px;
     background: var(--surface);
     color: var(--text);

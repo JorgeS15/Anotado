@@ -4,17 +4,29 @@ import { streamSSE } from 'hono/streaming';
 import { bodyLimit } from 'hono/body-limit';
 import { getConnInfo } from '@hono/node-server/conninfo';
 import { serveStatic } from '@hono/node-server/serve-static';
-import { existsSync, readFileSync } from 'node:fs';
-import { ColorNoteError, colorFor, noteIdFor, parseColorNote, type ColorNoteRecord } from './colornote.ts';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { LoginLimiter, SESSION_COOKIE, SESSION_MAX_AGE, Sessions, passwordMatches } from './auth.ts';
-import type { Store } from './db.ts';
-import { ValidationError, validateId, validateNote, type Note } from './notes.ts';
+import { addItems, createNote } from './automation.ts';
+import { backupPath, listBackups, readBackup } from './backup.ts';
+import { ColorNoteError, colorFor, noteIdFor, parseColorNote, type ColorNoteRecord } from './colornote.ts';
+import { sameContent, type Store } from './db.ts';
+import {
+  DEFAULT_SETTINGS,
+  ValidationError,
+  validateId,
+  validateNote,
+  validateSettings,
+  type Note,
+  type Settings,
+} from './notes.ts';
+import type { UpdateChecker } from './updates.ts';
 
 export type ServerEvent =
   | { type: 'upsert'; note: Note }
   | { type: 'delete'; id: string }
-  | { type: 'reload' };
+  | { type: 'reload' }
+  | { type: 'settings'; settings: Settings };
 
 export interface AppOptions {
   store: Store;
@@ -22,9 +34,32 @@ export interface AppOptions {
   secret: string;
   webDir?: string;
   version?: string;
+  /** Days a note stays in the trash before it is deleted for good. */
+  trashDays?: number;
+  /** Trust the client address in X-Forwarded-For (true behind Caddy or another reverse proxy). */
+  trustProxy?: boolean;
+  /** Lets automations call the API with "Authorization: Bearer <token>" instead of logging in. */
+  apiToken?: string;
+  /** Where the daily backups are written. */
+  backupDir?: string;
+  /** The SQLite file, to report its size. */
+  dbFile?: string;
+  updates?: UpdateChecker;
 }
 
-export function createApp({ store, password, secret, webDir, version = 'dev' }: AppOptions) {
+export function createApp({
+  store,
+  password,
+  secret,
+  webDir,
+  version = 'dev',
+  trashDays = 30,
+  trustProxy = true,
+  apiToken,
+  backupDir,
+  dbFile,
+  updates,
+}: AppOptions) {
   const app = new Hono();
   const sessions = new Sessions(secret, password);
   const limiter = new LoginLimiter();
@@ -35,8 +70,9 @@ export function createApp({ store, password, secret, webDir, version = 'dev' }: 
   };
 
   const clientKey = (c: Context) => {
-    // Behind Caddy the real client is the last hop Caddy appended.
-    const forwarded = c.req.header('x-forwarded-for');
+    // Behind Caddy the real client is the last hop Caddy appended. Without a proxy
+    // the header could be forged to dodge the login limit, so it is ignored.
+    const forwarded = trustProxy ? c.req.header('x-forwarded-for') : undefined;
     if (forwarded) return forwarded.split(',').at(-1)!.trim();
     try {
       return getConnInfo(c).remote.address ?? 'unknown';
@@ -84,7 +120,12 @@ export function createApp({ store, password, secret, webDir, version = 'dev' }: 
     const token = getCookie(c, SESSION_COOKIE);
     const authenticated = sessions.verify(token);
     if (sessions.needsRenewal(token)) issueSession(c);
-    return c.json({ authenticated, now: Date.now(), version });
+    return c.json({
+      authenticated,
+      now: Date.now(),
+      version,
+      ...(authenticated && { trash_days: trashDays, update: updates?.available() ?? null }),
+    });
   });
 
   app.post('/api/login', async (c) => {
@@ -110,8 +151,14 @@ export function createApp({ store, password, secret, webDir, version = 'dev' }: 
 
   // --- Authenticated endpoints --------------------------------------------
 
+  const tokenMatches = (c: Context) => {
+    if (!apiToken) return false;
+    const header = c.req.header('authorization') ?? '';
+    return header.startsWith('Bearer ') && passwordMatches(header.slice(7).trim(), apiToken);
+  };
+
   app.use('/api/*', async (c, next) => {
-    if (!sessions.verify(getCookie(c, SESSION_COOKIE))) {
+    if (!sessions.verify(getCookie(c, SESSION_COOKIE)) && !tokenMatches(c)) {
       return c.json({ error: 'unauthorized' }, 401);
     }
     await next();
@@ -152,6 +199,114 @@ export function createApp({ store, password, secret, webDir, version = 'dev' }: 
     const id = validateId(c.req.param('id'));
     if (store.delete(id)) broadcast({ type: 'delete', id });
     return c.json({ ok: true });
+  });
+
+  // --- Automations (token or session) --------------------------------------
+
+  /** Creates a note: `{ title, content }` or `{ title, items: [...] }`. */
+  app.post('/api/notes', async (c) => {
+    const result = createNote(store, await c.req.json(), clientId(c) ?? 'api');
+    broadcast({ type: 'upsert', note: result.note });
+    return c.json(result, 201);
+  });
+
+  /** Adds items to a checklist by name, e.g. `{ "list": "Compras", "items": ["Leite"] }`. */
+  app.post('/api/lists/items', async (c) => {
+    const result = addItems(store, await c.req.json(), clientId(c) ?? 'api');
+    broadcast({ type: 'upsert', note: result.note });
+    return c.json(result);
+  });
+
+  // --- Settings (shared by every device) --------------------------------------
+
+  const readSettings = (): Settings => {
+    const raw = store.getMeta('settings');
+    try {
+      return raw ? validateSettings(JSON.parse(raw)) : DEFAULT_SETTINGS;
+    } catch {
+      return DEFAULT_SETTINGS;
+    }
+  };
+
+  app.get('/api/settings', (c) => c.json(readSettings()));
+
+  app.put('/api/settings', async (c) => {
+    const settings = validateSettings(await c.req.json());
+    store.setMeta('settings', JSON.stringify(settings));
+    broadcast({ type: 'settings', settings });
+    return c.json(settings);
+  });
+
+  // --- Server status and backups ----------------------------------------------
+
+  app.get('/api/status', (c) => {
+    const notes = store.all();
+    const backups = backupDir ? listBackups(backupDir) : [];
+    let dbSize = 0;
+    for (const file of dbFile ? [dbFile, `${dbFile}-wal`] : []) {
+      try {
+        dbSize += statSync(file).size;
+      } catch {
+        /* no WAL file yet */
+      }
+    }
+    return c.json({
+      version,
+      update: updates?.available() ?? null,
+      notes: notes.filter((n) => n.deleted_at === null && !n.archived).length,
+      archived: notes.filter((n) => n.deleted_at === null && n.archived).length,
+      trashed: notes.filter((n) => n.deleted_at !== null).length,
+      db_size: dbSize,
+      trash_days: trashDays,
+      api_token: Boolean(apiToken),
+      backups,
+    });
+  });
+
+  app.get('/api/backups/:name', (c) => {
+    const file = backupDir ? backupPath(backupDir, c.req.param('name')) : null;
+    if (!file) return c.json({ error: 'not found' }, 404);
+    c.header('Content-Disposition', `attachment; filename="${c.req.param('name')}"`);
+    c.header('Content-Type', 'application/json');
+    return c.body(readFileSync(file));
+  });
+
+  /**
+   * Brings back every note as it was in a backup. Notes changed since then get the
+   * backup's content as a new edit (the current one stays in their history);
+   * notes created after the backup are left alone.
+   */
+  app.post('/api/backups/:name/restore', (c) => {
+    const file = backupDir ? backupPath(backupDir, c.req.param('name')) : null;
+    if (!file) return c.json({ error: 'not found' }, 404);
+    let raw: unknown[];
+    try {
+      raw = readBackup(file);
+    } catch {
+      throw new ValidationError('O backup está danificado.');
+    }
+    const notes = raw.map(validateNote);
+    const now = Date.now();
+    const restored = store.transaction(() => {
+      let count = 0;
+      for (const note of notes) {
+        const current = store.get(note.id);
+        const same =
+          current &&
+          sameContent(current, note) &&
+          current.color === note.color &&
+          current.pinned === note.pinned &&
+          current.archived === note.archived &&
+          current.deleted_at === note.deleted_at;
+        if (same) continue;
+        const updated_at = Math.max(now, (current?.updated_at ?? 0) + 1);
+        store.upsert({ ...note, updated_at }, { client: 'restore', forceVersion: true }, now);
+        count++;
+      }
+      return count;
+    });
+    broadcast({ type: 'reload' });
+    return c.json({ restored, total: notes.length });
   });
 
   app.get('/api/export', (c) => {

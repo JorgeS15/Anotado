@@ -1,4 +1,4 @@
-import { mkdirSync, readdirSync, renameSync, unlinkSync, writeFileSync, existsSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Store } from './db.ts';
 
@@ -27,4 +27,39 @@ export function dailyBackup(store: Store, dir: string, keep: number, now = new D
     .slice(keep);
   for (const f of old) unlinkSync(join(dir, f));
   return written;
+}
+
+export interface BackupInfo {
+  name: string;
+  size: number;
+  /** When the backup was written. */
+  created_at: number;
+}
+
+/** Daily backups in `dir`, newest first. */
+export function listBackups(dir: string): BackupInfo[] {
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .filter((f) => NAME_RE.test(f))
+    .sort()
+    .reverse()
+    .map((name) => {
+      const stat = statSync(join(dir, name));
+      return { name, size: stat.size, created_at: stat.mtimeMs };
+    });
+}
+
+/** The path of a backup by name, or null if the name is not a backup in `dir`. */
+export function backupPath(dir: string, name: string): string | null {
+  if (!NAME_RE.test(name)) return null;
+  const file = join(dir, name);
+  return existsSync(file) ? file : null;
+}
+
+/** Reads the notes of a backup file (raw, to be validated by the caller). */
+export function readBackup(file: string): unknown[] {
+  const data = JSON.parse(readFileSync(file, 'utf8'));
+  const notes = Array.isArray(data) ? data : data?.notes;
+  if (!Array.isArray(notes)) throw new Error('not an Anotado backup');
+  return notes;
 }

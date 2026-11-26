@@ -2,6 +2,7 @@
   import { HttpError, store } from '../lib/store.svelte';
   import { COLORS, COLOR_LABELS, type Color, type ColorNotePreview } from '../lib/types';
   import Icon from './Icon.svelte';
+  import Sheet from './Sheet.svelte';
 
   let { onclose, notify }: { onclose: () => void; notify: (message: string) => void } = $props();
 
@@ -15,16 +16,6 @@
   const archived = $derived(preview?.records.filter((r) => r.archived).length ?? 0);
   const checklists = $derived(preview?.records.filter((r) => r.type === 'checklist').length ?? 0);
 
-  $effect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        onclose();
-      }
-    };
-    document.addEventListener('keydown', onKey, true);
-    return () => document.removeEventListener('keydown', onKey, true);
-  });
 
   async function read(e: SubmitEvent) {
     e.preventDefault();
@@ -56,12 +47,7 @@
   }
 </script>
 
-<div class="backdrop" role="presentation" onclick={(e) => e.target === e.currentTarget && onclose()}>
-  <div class="sheet" role="dialog" aria-label="Importar do ColorNote">
-    <header>
-      <h2>Importar do ColorNote</h2>
-      <button class="icon-btn" onclick={onclose} aria-label="Fechar"><Icon name="close" /></button>
-    </header>
+<Sheet title="Importar do ColorNote" {onclose}>
 
     <div class="content">
       {#if !preview}
@@ -121,54 +107,16 @@
         </div>
       {/if}
     </div>
-  </div>
-</div>
+</Sheet>
 
 <style>
-  .backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 40;
-    background: rgba(0, 0, 0, 0.4);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 16px;
-  }
 
-  .sheet {
-    width: min(600px, 100%);
-    max-height: min(88dvh, 100%);
-    display: flex;
-    flex-direction: column;
-    background: var(--surface);
-    color: var(--text);
-    border-radius: 18px;
-    box-shadow: var(--shadow-lg);
-    overflow: hidden;
-  }
 
-  header {
-    display: flex;
-    align-items: center;
-    padding: 8px 8px 8px 20px;
-    border-bottom: 1px solid var(--border);
-  }
 
-  h2 {
-    flex: 1;
-    margin: 0;
-    font-size: 1.1rem;
-  }
 
   h3 {
     margin: 16px 0 4px;
     font-size: 1rem;
-  }
-
-  .content {
-    overflow-y: auto;
-    padding: 16px 20px 20px;
   }
 
   form {
