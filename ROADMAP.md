@@ -17,7 +17,7 @@ Feitos na 1.1.3: alterações recusadas pelo servidor já não se perdem, limite
 |---|---|---|---|
 | 1 | **Testar a importação do ColorNote com um backup real** | O formato não é público. A importação só foi testada com ficheiros gerados no mesmo formato. Desde a 1.1.3, as mensagens de erro dizem em que passo um backup falha. | P |
 | 2 | **README em inglês e captura de ecrã** | Para um projeto público, o README só em português chega a pouca gente, e uma imagem explica a app em segundos. | P |
-| 3 | **Atualizar o Playwright e voltar ao `ubuntu-latest` no CI** | O CI está fixo no Ubuntu 24.04 porque o Playwright 1.56 não suporta o 26.04. | P |
+| 3 | **Atualizar o Playwright e voltar ao `ubuntu-latest` no CI** | O CI está fixo no Ubuntu 24.04 porque o Playwright 1.56 não suportava o 26.04. | P |
 | 4 | **Rever os PRs do Dependabot com versões principais** | TypeScript 7, Node 26, `@types/node` 26: atualizar um de cada vez, com os testes a confirmar, ou fechar. | P–M |
 | 5 | **Dividir o `App.svelte`** | Com quase 900 linhas, junta cabeçalho, filtros, seleção, menus e navegação. Separar em componentes torna as próximas alterações mais seguras. | M |
 
@@ -32,18 +32,36 @@ Feitos na 1.1.3: alterações recusadas pelo servidor já não se perdem, limite
 | 10 | **Acessibilidade com teclado e leitor de ecrã** | Os diálogos não prendem o foco, os menus não respondem às setas e só dá para reordenar a checklist com o rato ou o dedo. | M |
 | 11 | **Dias no lixo configuráveis** (`TRASH_DAYS`) | Os 30 dias estão fixos no código. | P |
 | 12 | **Cor da barra do sistema igual à da nota aberta** | No telemóvel, a barra de estado fica amarela mesmo com uma nota azul aberta. | P |
+| 13 | **Esconder os itens concluídos** de uma checklist | Os concluídos já vão para o fundo; numa lista longa, poder recolhê-los deixa só o que falta fazer. | P |
+| 14 | **Mais atalhos de teclado no PC** e uma ajuda com a lista (`?`) | Já existem `n`, `l` e `/`. Faltam `Ctrl+Enter` para fechar a nota e uma forma de descobrir os atalhos. | P |
+| 15 | **Tamanho de letra** (pequeno, normal, grande) | A vista em lista já existe; o tamanho de letra ajuda a ler no telemóvel ou a ver mais notas no PC. | P |
+| 16 | **Exportar ou imprimir uma nota** (texto ou Markdown) | Hoje só se exporta tudo em JSON. | P |
+| 17 | **Página de estado do servidor**: número de notas, espaço usado, último backup, versão | Mostra de relance se os backups estão a correr. | P |
+| 18 | **Aviso quando há uma versão nova** | O servidor compara a sua versão com a última release no GitHub e mostra-o no menu. | P |
+| 19 | **Modelos de notas** (ex.: "Lista de compras base", "Mala de viagem") | Junta-se bem com o "Desmarcar tudo" para listas que se repetem. | M |
+| 20 | **Sub-itens na checklist** (indentação) | Agrupar, por exemplo, "Talho → frango, carne picada". | M |
+
+## Integrações
+
+| # | O quê | Porquê | Esforço |
+|---|---|---|---|
+| 21 | **Token de API para automações** | Permite criar notas ou acrescentar itens por um pedido HTTP simples, sem a password principal. Abre a porta ao Home Assistant, aos Atalhos do iPhone e ao Tasker. | M |
+| 22 | **"Adiciona leite à lista de compras" por voz** | Usa o token acima com um script do Home Assistant ou um comando do Assist. | M |
+| 23 | **Checklists como listas de tarefas do Home Assistant** (integração *todo*) | Verias e marcarias a lista de compras no painel do Home Assistant. Exige uma integração própria em Python. | G |
 
 ## Depois — funcionalidades maiores (1.3+)
 
 | # | O quê | Porquê | Esforço |
 |---|---|---|---|
-| 13 | **Lembretes com notificação** | É a maior funcionalidade do ColorNote que falta. Numa PWA exige Web Push enviado pelo servidor, com chaves VAPID e permissão de notificações. | G |
-| 14 | **Interface em inglês** (e outras línguas) | A interface só existe em português. Num projeto público, a língua seguiria a do browser. | M |
-| 15 | **Backups fora do servidor** (WebDAV, S3 ou uma pasta sincronizada) | Hoje os backups ficam no mesmo disco que a base de dados: se o disco falhar, perde-se tudo. | M |
-| 16 | **Mudar a password e terminar outras sessões a partir da app** | Hoje a password só se muda na variável de ambiente, o que termina todas as sessões. | M |
-| 17 | **Imagens nas notas** | Fotos de recibos, quadros ou receitas. Exige guardar ficheiros, sincronizá-los e incluí-los nos backups. | G |
-| 18 | **Formatação simples** (negrito, listas com marcadores) | Só se for possível sem complicar o editor. | M |
-| 19 | **`TRUST_PROXY` configurável** | O limite de tentativas de login confia no cabeçalho do Caddy. Uma opção explícita protege quem expuser a porta diretamente. | P |
+| 24 | **Lembretes com notificação** | É a maior funcionalidade do ColorNote que falta. Numa PWA exige Web Push enviado pelo servidor, com chaves VAPID e permissão de notificações. | G |
+| 25 | **Vista de calendário** | Notas por dia de criação ou de lembrete, como no ColorNote. Faz mais sentido depois dos lembretes. | M |
+| 26 | **Interface em inglês** (e outras línguas) | A interface só existe em português. Num projeto público, a língua seguiria a do browser. | M |
+| 27 | **Backups fora do servidor** (WebDAV, S3 ou uma pasta sincronizada) | Hoje os backups ficam no mesmo disco que a base de dados: se o disco falhar, perde-se tudo. | M |
+| 28 | **Mudar a password e terminar outras sessões a partir da app** | Hoje a password só se muda na variável de ambiente, o que termina todas as sessões. | M |
+| 29 | **Bloquear notas com PIN** | Esconde notas sensíveis de quem pega no telemóvel. É só um bloqueio visual, não encripta os dados. | M |
+| 30 | **Imagens nas notas** | Fotos de recibos, quadros ou receitas. Exige guardar ficheiros, sincronizá-los e incluí-los nos backups. | G |
+| 31 | **Formatação simples** (negrito, listas com marcadores) | Só se for possível sem complicar o editor. | M |
+| 32 | **`TRUST_PROXY` configurável** | O limite de tentativas de login confia no cabeçalho do Caddy. Uma opção explícita protege quem expuser a porta diretamente. | P |
 
 ## Fora do âmbito (por agora)
 
