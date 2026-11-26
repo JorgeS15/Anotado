@@ -64,7 +64,7 @@ export interface ColorNotePreview {
   colors: { index: number; count: number; samples: string[]; suggested: Color }[];
 }
 
-export type View = 'notes' | 'archive' | 'trash';
+export type View = 'notes' | 'reminders' | 'archive' | 'trash';
 export type SortMode = 'updated' | 'created' | 'color' | 'title' | 'manual';
 export type Layout = 'grid' | 'list';
 export type Theme = 'auto' | 'light' | 'dark';

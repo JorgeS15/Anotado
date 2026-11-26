@@ -36,6 +36,8 @@
       if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return;
       const options = [...root.querySelectorAll<HTMLElement>('.panel button:not([disabled]), .panel a[href]')];
       if (!options.length || !root.contains(document.activeElement)) return;
+      // Fields (like the reminder's date and time) use the arrow keys themselves.
+      if ((document.activeElement as HTMLElement).closest('input, textarea, select')) return;
       e.preventDefault();
       const at = options.indexOf(document.activeElement as HTMLElement);
       const next =

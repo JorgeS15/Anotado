@@ -29,7 +29,7 @@
     type Theme,
     type View,
   } from './lib/types';
-  import { normalize, readPref, searchText, uid, writePref } from './lib/util';
+  import { formatDay, normalize, readPref, searchText, uid, writePref } from './lib/util';
 
   const SORTS: { value: SortMode; label: string }[] = [
     { value: 'updated', label: 'Data de alteração' },
@@ -38,7 +38,7 @@
     { value: 'title', label: 'Título' },
     { value: 'manual', label: 'Manual (arrastar)' },
   ];
-  const VIEW_TITLES: Record<View, string> = { notes: 'Anotado', archive: 'Arquivo', trash: 'Lixo' };
+  const VIEW_TITLES: Record<View, string> = { notes: 'Anotado', reminders: 'Lembretes', archive: 'Arquivo', trash: 'Lixo' };
 
   let view = $state<View>('notes');
   let query = $state('');
@@ -119,6 +119,7 @@
 
   const all = $derived(Object.values(store.notes));
   const counts = $derived({
+    reminders: all.filter((n) => n.deleted_at == null && n.reminder_at != null && n.reminder_at >= Date.now()).length,
     archive: all.filter((n) => n.archived && n.deleted_at == null).length,
     trash: all.filter((n) => n.deleted_at != null).length,
   });
@@ -129,6 +130,7 @@
       if (view === 'trash' ? n.deleted_at == null : n.deleted_at != null) return false;
       if (view === 'notes' && n.archived) return false;
       if (view === 'archive' && !n.archived) return false;
+      if (view === 'reminders' && n.reminder_at == null) return false;
       if (colorFilter && n.color !== colorFilter) return false;
       if (q && !searchText(n).includes(q)) return false;
       return true;
@@ -144,12 +146,13 @@
       manual: (a, b) => (rank.get(a.id) ?? -1) - (rank.get(b.id) ?? -1) || b.updated_at - a.updated_at,
     };
     if (view === 'trash') return list.sort((a, b) => (b.deleted_at ?? 0) - (a.deleted_at ?? 0));
+    if (view === 'reminders') return list.sort((a, b) => a.reminder_at! - b.reminder_at!);
     return list.sort((a, b) => Number(b.pinned) - Number(a.pinned) || compare[sort](a, b));
   });
   // --- Manual order -------------------------------------------------------------
 
   let dragging = $state<{ id: string; order: string[] } | null>(null);
-  const reorderable = $derived(sort === 'manual' && view !== 'trash' && !query.trim());
+  const reorderable = $derived(sort === 'manual' && view !== 'trash' && view !== 'reminders' && !query.trim());
 
   /** The full order with the visible notes as they are on screen, keeping hidden ones after them. */
   function currentOrder(): string[] {
@@ -205,6 +208,21 @@
     window.addEventListener('pointerup', end);
     window.addEventListener('pointercancel', end);
   }
+
+  /** Reminders by day: upcoming first (soonest first), then the past ones (latest first). */
+  const agenda = $derived.by(() => {
+    if (view !== 'reminders') return [];
+    const nowTs = Date.now();
+    const groups: { label: string; notes: Note[] }[] = [];
+    for (const note of visible.filter((n) => n.reminder_at! >= nowTs)) {
+      const label = formatDay(note.reminder_at!);
+      if (groups.at(-1)?.label !== label) groups.push({ label, notes: [] });
+      groups.at(-1)!.notes.push(note);
+    }
+    const past = visible.filter((n) => n.reminder_at! < nowTs).reverse();
+    if (past.length) groups.push({ label: 'Passados', notes: past });
+    return groups;
+  });
 
   const pinned = $derived(view === 'trash' ? [] : visible.filter((n) => n.pinned));
   const others = $derived(view === 'trash' ? visible : visible.filter((n) => !n.pinned));
@@ -503,7 +521,7 @@
     {#if colorFilter && store.settings.color_names[colorFilter]}
       <span class="filter-name">{colorLabel(colorFilter)}</span>
     {/if}
-    {#if view !== 'trash'}
+    {#if view !== 'trash' && view !== 'reminders'}
       <Popover bind:open={sortOpen}>
         {#snippet trigger(toggle)}
           <button class="icon-btn" onclick={toggle} title="Ordenar"><Icon name="sort" size={20} /></button>
@@ -556,6 +574,8 @@
           Sem resultados.
         {:else if view === 'archive'}
           Nada arquivado.
+        {:else if view === 'reminders'}
+          Sem lembretes.<br />Abre uma nota e toca no sino para criar um.
         {:else if view === 'trash'}
           O lixo está vazio.
         {:else}
@@ -564,7 +584,16 @@
       </p>
     {/if}
 
-    {#if pinned.length}
+    {#if view === 'reminders'}
+      {#each agenda as group (group.label)}
+        <h2>{group.label}</h2>
+        <div class="notes {layout}">
+          {#each group.notes as note (note.id)}
+            {@render noteCard(note)}
+          {/each}
+        </div>
+      {/each}
+    {:else if pinned.length}
       <h2>Fixadas</h2>
       <div class="notes {layout}">
         {#each pinned as note (note.id)}
@@ -573,11 +602,13 @@
       </div>
       {#if others.length}<h2>Outras</h2>{/if}
     {/if}
+    {#if view !== 'reminders'}
     <div class="notes {layout}">
       {#each others as note (note.id)}
         {@render noteCard(note)}
       {/each}
     </div>
+    {/if}
   </main>
 
   {#if view !== 'trash' && !selectMode}

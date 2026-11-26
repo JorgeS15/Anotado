@@ -285,3 +285,19 @@ test('a due reminder shows in the open app and opens its note', async ({ page })
   await page.keyboard.press('Escape');
   await expect(card(page, 'Ligar à avó').locator('.reminder')).toHaveCount(0);
 });
+
+test('the reminders view lists notes by the day of their reminder', async ({ page }) => {
+  await login(page);
+  await page.click('.fab-btn');
+  await page.click('.fab >> text=Texto');
+  await page.fill('.editor .title', 'Dentista');
+  await page.fill('.editor .content', 'Levar o cartão');
+  await page.click('.editor button[title="Lembrete"]');
+  await page.click('.editor >> text=Amanhã às 9:00');
+  await page.keyboard.press('Escape');
+  await page.click('[aria-label="Menu"]');
+  await page.locator('.panel .item', { hasText: 'Lembretes' }).click();
+  await expect(page.locator('.top h1')).toHaveText('Lembretes');
+  await expect(page.locator('main h2', { hasText: 'Amanhã' })).toBeVisible();
+  await expect(card(page, 'Dentista')).toContainText('amanhã, 09:00');
+});

@@ -33,7 +33,7 @@
     onlogoutothers,
   }: {
     view: View;
-    counts: { archive: number; trash: number };
+    counts: { reminders: number; archive: number; trash: number };
     theme: Theme;
     fontSize: FontSize;
     ongo: (view: View) => void;
@@ -61,6 +61,9 @@
   {#snippet children(close)}
     <button class="item" class:selected={view === 'notes'} onclick={() => (close(), ongo('notes'))}>
       <Icon name="notes" /> Notas
+    </button>
+    <button class="item" class:selected={view === 'reminders'} onclick={() => (close(), ongo('reminders'))}>
+      <Icon name="bell" /> Lembretes {#if counts.reminders}<span class="count">{counts.reminders}</span>{/if}
     </button>
     <button class="item" class:selected={view === 'archive'} onclick={() => (close(), ongo('archive'))}>
       <Icon name="archive" /> Arquivo {#if counts.archive}<span class="count">{counts.archive}</span>{/if}

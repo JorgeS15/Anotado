@@ -6,7 +6,7 @@ e as versões seguem [Semantic Versioning](https://semver.org/lang/pt-PT/).
 ## [1.2.0] - 2026-11-26
 
 ### Added
-- **Lembretes com notificação**: o sino no editor define um lembrete (atalhos como "Amanhã às 9:00" ou uma data à escolha). Na hora, o servidor envia uma notificação Web Push a todos os dispositivos com notificações ativas, mesmo com a app fechada, e tocar nela abre a nota. Com a app aberta, aparece também um aviso. As notificações ativam-se, desligam-se e testam-se em Servidor e backups. Sem dependências novas: a encriptação e o VAPID usam o `crypto` do Node.
+- **Lembretes com notificação**: o sino no editor define um lembrete (atalhos como "Amanhã às 9:00" ou uma data à escolha). Na hora, o servidor envia uma notificação Web Push a todos os dispositivos com notificações ativas, mesmo com a app fechada, e tocar nela abre a nota. Com a app aberta, aparece também um aviso. Menu → Lembretes mostra as notas com lembrete agrupadas por dia. As notificações ativam-se, desligam-se e testam-se em Servidor e backups. Sem dependências novas: a encriptação e o VAPID usam o `crypto` do Node.
 - **Nomes para as cores** (Menu → Nomes das cores): por exemplo, verde = "Compras". Aparecem no filtro e ao escolher a cor, e são partilhados por todos os dispositivos.
 - **Checklists**: "Desmarcar tudo" e "Apagar concluídos" (com Anular) no menu da nota, e os itens concluídos podem ser recolhidos num toque.
 - **Sub-itens nas checklists**: `Tab` num item torna-o sub-item do de cima (`Shift`+`Tab` desfaz); no telemóvel, arrasta-o pela pega para a direita ou para a esquerda. Aparecem indentados no cartão, no Markdown e na impressão.

@@ -105,3 +105,17 @@ export function formatReminder(ts: number): string {
   if (d.toDateString() === tomorrow.toDateString()) return `amanhã, ${reminderTime.format(d)}`;
   return reminderFormat.format(d);
 }
+
+const dayFormat = new Intl.DateTimeFormat('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' });
+
+/** "Hoje", "Amanhã" or "quinta-feira, 3 de dezembro", for grouping by day. */
+export function formatDay(ts: number): string {
+  const d = new Date(ts);
+  const today = new Date();
+  const tomorrow = new Date();
+  tomorrow.setDate(today.getDate() + 1);
+  if (d.toDateString() === today.toDateString()) return 'Hoje';
+  if (d.toDateString() === tomorrow.toDateString()) return 'Amanhã';
+  const label = dayFormat.format(d);
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}

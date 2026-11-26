@@ -22,7 +22,7 @@ CI de volta ao `ubuntu-latest` e o `App.svelte` dividido em componentes. Detalhe
 | # | O quê | Porquê | Esforço |
 |---|---|---|---|
 | 1 | **Testar a importação do ColorNote com um backup real** | O formato não é público. A importação só foi testada com ficheiros gerados no mesmo formato. As mensagens de erro dizem em que passo um backup falha. | P |
-| 2 | **Experimentar o guia do Home Assistant numa instalação real** | Os exemplos de `rest_command` e das frases do Assist seguem a documentação, mas ainda não correram num Home Assistant. | P |
+| 2 | **Experimentar os lembretes num telemóvel real e o guia do Home Assistant numa instalação real** | As notificações foram testadas no Chromium (encriptação conforme o RFC 8291), mas não num Android ou iPhone com o serviço de push real. Os exemplos do Home Assistant seguem a documentação, mas ainda não correram numa instalação. | P |
 | 3 | **Atualizar as versões principais quando fizer sentido** | Os PRs do Dependabot com versões principais foram fechados. O Node 24 é LTS até 2028; o TypeScript 7 espera pelo suporte do `svelte-check`. | P |
 
 ## Próximo — uso do dia a dia (1.3)
@@ -41,7 +41,7 @@ CI de volta ao `ubuntu-latest` e o `App.svelte` dividido em componentes. Detalhe
 
 | # | O quê | Porquê | Esforço |
 |---|---|---|---|
-| 6 | **Vista de calendário** | Notas por dia de criação ou de lembrete, como no ColorNote. Os lembretes já existem; o calendário mostrá-los-ia por dia. | M |
+| 6 | **Vista de calendário em grelha (mês)** | A vista Lembretes já agrupa por dia; uma grelha do mês ajudaria a ver a semana ou o mês de relance. | M |
 | 7 | **Interface em inglês** (e outras línguas) | A interface só existe em português. Num projeto público, a língua seguiria a do browser. | M |
 | 8 | **Mudar a password a partir da app** | Hoje só se muda na variável de ambiente. Terminar a sessão nos outros dispositivos já é possível no menu. | M |
 | 9 | **Bloquear notas com PIN** | Esconde notas sensíveis de quem pega no telemóvel. É só um bloqueio visual, não encripta os dados. | M |
