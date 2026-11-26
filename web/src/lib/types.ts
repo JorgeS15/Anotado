@@ -65,9 +65,20 @@ export type SortMode = 'updated' | 'created' | 'color' | 'title';
 export type Layout = 'grid' | 'list';
 export type Theme = 'auto' | 'light' | 'dark';
 
+export interface Template {
+  id: string;
+  name: string;
+  type: NoteType;
+  title: string;
+  content: string;
+  items: string[];
+  color: Color;
+}
+
 export interface Settings {
   /** A name for each colour, e.g. green = "Compras". */
   color_names: Partial<Record<Color, string>>;
+  templates: Template[];
 }
 
 export interface BackupInfo {

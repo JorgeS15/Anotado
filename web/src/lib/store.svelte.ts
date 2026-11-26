@@ -60,11 +60,13 @@ function rememberAuth(value: boolean) {
 function loadSettings(): Settings {
   try {
     const raw = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? 'null');
-    if (raw && typeof raw.color_names === 'object') return { color_names: raw.color_names ?? {} };
+    if (raw && typeof raw.color_names === 'object') {
+      return { color_names: raw.color_names ?? {}, templates: Array.isArray(raw.templates) ? raw.templates : [] };
+    }
   } catch {
     /* ignore */
   }
-  return { color_names: {} };
+  return { color_names: {}, templates: [] };
 }
 
 function storeSettings(settings: Settings, pending: boolean) {
@@ -197,7 +199,7 @@ class NoteStore {
     );
     this.notes = {};
     this.rejected = {};
-    this.settings = { color_names: {} };
+    this.settings = { color_names: {}, templates: [] };
     storeSettings(this.settings, false);
     this.outboxIds.clear();
     this.pending = 0;

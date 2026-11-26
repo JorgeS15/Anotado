@@ -12,6 +12,7 @@
   import SelectBar from './components/SelectBar.svelte';
   import ServerStatus from './components/ServerStatus.svelte';
   import Shortcuts from './components/Shortcuts.svelte';
+  import Templates from './components/Templates.svelte';
   import { now } from './lib/clock';
   import { pwa } from './lib/pwa.svelte';
   import { colorLabel, store } from './lib/store.svelte';
@@ -23,6 +24,7 @@
     type Note,
     type NoteType,
     type SortMode,
+    type Template,
     type Theme,
     type View,
   } from './lib/types';
@@ -51,7 +53,7 @@
   let fabOpen = $state(false);
   let searchEl = $state<HTMLInputElement>();
   let importEl = $state<HTMLInputElement>();
-  let sheet = $state<'colornote' | 'colornames' | 'server' | 'shortcuts' | null>(null);
+  let sheet = $state<'colornote' | 'colornames' | 'server' | 'shortcuts' | 'templates' | null>(null);
 
   let selectMode = $state(false);
   const selected = new SvelteSet<string>();
@@ -163,16 +165,17 @@
     history.pushState({ editor: true, view }, '');
   }
 
-  function newNote(type: NoteType, title = '', content = '') {
+  function newNote(type: NoteType, title = '', content = '', template?: Template) {
     if (view === 'trash') goTo('notes');
     const time = now();
+    const items = template?.items.length ? template.items : [''];
     const draft: Note = {
       id: uid(),
       type,
       title,
       content,
-      items: type === 'checklist' ? [{ id: uid(), text: '', done: false }] : [],
-      color: colorFilter ?? 'yellow',
+      items: type === 'checklist' ? items.map((text) => ({ id: uid(), text, done: false })) : [],
+      color: template?.color ?? colorFilter ?? 'yellow',
       pinned: false,
       archived: view === 'archive',
       deleted_at: null,
@@ -488,6 +491,19 @@
           <button class="item" onclick={() => (close(), newNote('checklist'))}>
             <Icon name="checklist" /> Checklist
           </button>
+          {#if store.settings.templates.length}
+            <hr />
+            <div class="label">Modelos</div>
+            {#each store.settings.templates as t (t.id)}
+              <button class="item" onclick={() => (close(), newNote(t.type, t.title, t.content, t))}>
+                <Icon name={t.type === 'checklist' ? 'checklist' : 'text'} />
+                <span class="template-name">{t.name}</span>
+              </button>
+            {/each}
+            <button class="item manage" onclick={() => (close(), (sheet = 'templates'))}>
+              <Icon name="template" /> Gerir modelos
+            </button>
+          {/if}
         {/snippet}
       </Popover>
     </div>
@@ -511,6 +527,8 @@
     <ColorNames onclose={() => (sheet = null)} {notify} />
   {:else if sheet === 'server'}
     <ServerStatus onclose={() => (sheet = null)} {notify} />
+  {:else if sheet === 'templates'}
+    <Templates onclose={() => (sheet = null)} {notify} />
   {:else if sheet === 'shortcuts'}
     <Shortcuts onclose={() => (sheet = null)} />
   {/if}
@@ -761,6 +779,17 @@
 
   .fab :global(.panel) {
     min-width: 170px;
+    max-width: min(300px, calc(100vw - 40px));
+  }
+
+  .template-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .manage {
+    color: var(--text-2);
+    font-size: 0.9rem;
   }
 
   .toast {

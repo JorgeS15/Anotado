@@ -42,6 +42,7 @@ export const ICONS = {
   uncheck: '<rect x="4" y="4" width="16" height="16" rx="3.5"/><path d="M9 9l6 6M15 9l-6 6"/>',
   broom: '<path d="M14 4l6 6M4 20l7.5-7.5M9 11l4 4-3 5H4v-6z"/>',
   chevron: '<path d="M6 9l6 6 6-6"/>',
+  template: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h4" stroke-dasharray="2 2"/>',
 } as const;
 
 export type IconName = keyof typeof ICONS;

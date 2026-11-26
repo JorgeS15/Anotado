@@ -6,10 +6,10 @@ async function createChecklist(page: import('@playwright/test').Page, title: str
   await page.click('.fab-btn');
   await page.click('.fab >> text=Checklist');
   await page.fill('.editor .title', title);
-  for (const [i, text] of items.entries()) {
-    if (i) await page.keyboard.press('Enter');
+  await page.locator('.editor [data-item]').first().fill(items[0]);
+  for (const text of items.slice(1)) {
+    await page.keyboard.press('Enter');
     await page.keyboard.type(text);
-    if (!i) await page.locator('[data-item]').first().fill(text);
   }
 }
 
@@ -133,4 +133,28 @@ test('Ctrl+Enter closes a note and the status bar takes its colour @mobile', asy
   await page.locator('.editor .title').press('Control+Enter');
   await expect(page.locator('.editor')).toHaveCount(0);
   await expect.poll(themeColor).toBe(appColor);
+});
+
+test('a checklist saved as a template creates new lists with the items unticked', async ({ page }) => {
+  await login(page);
+  await createChecklist(page, 'Mala de viagem', ['Escova', 'Carregador']);
+  await page.locator('.editor [role=checkbox]').first().click();
+  await page.click('header button[title="Mais opções"]');
+  page.once('dialog', (d) => d.accept('Mala'));
+  await page.locator('.panel .item', { hasText: 'Guardar como modelo' }).click();
+  await expect(page.locator('.toast')).toContainText('Modelo "Mala" guardado');
+  await page.keyboard.press('Escape');
+
+  await page.click('.fab-btn');
+  await page.locator('.fab .item', { hasText: 'Mala' }).click();
+  await expect(page.locator('.editor .title')).toHaveValue('Mala de viagem');
+  expect(await itemTexts(page)).toEqual(['Escova', 'Carregador']);
+  await expect(page.locator('.editor .done-label')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(card(page, 'Mala de viagem')).toHaveCount(2);
+
+  await page.click('.fab-btn');
+  await page.click('.fab >> text=Gerir modelos');
+  await page.click('[aria-label="Apagar modelo Mala"]');
+  await expect(page.locator('.sheet')).toContainText('Ainda não tens modelos');
 });

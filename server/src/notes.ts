@@ -94,12 +94,45 @@ export function validateNote(input: unknown): Note {
   };
 }
 
+export interface Template {
+  id: string;
+  /** Shown in the "new note" menu. */
+  name: string;
+  type: NoteType;
+  title: string;
+  content: string;
+  /** Item texts; notes made from the template start with them unticked. */
+  items: string[];
+  color: Color;
+}
+
 export interface Settings {
   /** A name for each colour, e.g. green = "Compras". Unnamed colours are left out. */
   color_names: Partial<Record<Color, string>>;
+  templates: Template[];
 }
 
-export const DEFAULT_SETTINGS: Settings = { color_names: {} };
+export const DEFAULT_SETTINGS: Settings = { color_names: {}, templates: [] };
+const MAX_TEMPLATES = 30;
+
+function validateTemplate(input: unknown, i: number): Template {
+  if (!input || typeof input !== 'object') throw new ValidationError(`templates[${i}] must be an object`);
+  const t = input as Record<string, unknown>;
+  const items = t.items ?? [];
+  if (!Array.isArray(items) || items.length > MAX_ITEMS) throw new ValidationError(`templates[${i}].items must be a list`);
+  const type = t.type === 'checklist' ? 'checklist' : 'text';
+  const name = str(t.name, `templates[${i}].name`, 60).trim();
+  if (!name) throw new ValidationError(`templates[${i}].name must not be empty`);
+  return {
+    id: validateId(t.id),
+    name,
+    type,
+    title: str(t.title, `templates[${i}].title`, 1_000),
+    content: type === 'text' ? str(t.content, `templates[${i}].content`, MAX_TEXT) : '',
+    items: type === 'checklist' ? items.map((text, j) => str(text, `templates[${i}].items[${j}]`, 10_000)) : [],
+    color: COLORS.includes(t.color as Color) ? (t.color as Color) : 'yellow',
+  };
+}
 
 export function validateSettings(input: unknown): Settings {
   if (!input || typeof input !== 'object') throw new ValidationError('settings must be an object');
@@ -111,5 +144,8 @@ export function validateSettings(input: unknown): Settings {
     const name = str(value, `color_names.${key}`, 40).trim();
     if (name) color_names[key as Color] = name;
   }
-  return { color_names };
+  const templates = (input as Record<string, unknown>).templates ?? [];
+  if (!Array.isArray(templates)) throw new ValidationError('templates must be a list');
+  if (templates.length > MAX_TEMPLATES) throw new ValidationError(`at most ${MAX_TEMPLATES} templates`);
+  return { color_names, templates: templates.map(validateTemplate) };
 }

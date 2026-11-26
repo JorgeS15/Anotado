@@ -3,7 +3,7 @@
   import { autogrow } from '../lib/autogrow';
   import { now } from '../lib/clock';
   import { store } from '../lib/store.svelte';
-  import type { Color, Note } from '../lib/types';
+  import type { Color, Note, Template } from '../lib/types';
   import { LIMITS, formatCount } from '../lib/limits';
   import { download, fileName, printNote, toMarkdown } from '../lib/export';
   import { trapFocus } from '../lib/focus';
@@ -181,6 +181,29 @@
     notify(`${before.length - note.items.length} itens apagados`, () => store.update(noteId, { items: before }));
   }
 
+  function saveTemplate() {
+    if (!note) return;
+    const { templates } = store.settings;
+    const name = prompt('Nome do modelo (aparece no botão +):', note.title.trim() || 'Modelo')?.trim().slice(0, 60);
+    if (!name) return;
+    const others = templates.filter((t) => t.name !== name);
+    if (others.length >= 30) {
+      notify('Já tens 30 modelos. Apaga algum no botão + → Gerir modelos.');
+      return;
+    }
+    const template: Template = {
+      id: uid(),
+      name,
+      type: note.type,
+      title: note.title,
+      content: note.type === 'text' ? note.content : '',
+      items: note.type === 'checklist' ? note.items.map((i) => i.text).filter((t) => t.trim()) : [],
+      color: note.color,
+    };
+    store.saveSettings({ ...$state.snapshot(store.settings), templates: [...others, template] });
+    notify(`Modelo "${name}" guardado`);
+  }
+
   function exportMarkdown() {
     if (!note) return;
     download(fileName(note, 'md'), toMarkdown(note));
@@ -300,6 +323,9 @@
               </button>
               <button class="item" onclick={() => (close(), print())}><Icon name="print" /> Imprimir</button>
               <button class="item" onclick={() => (close(), duplicate())}><Icon name="copy" /> Duplicar</button>
+              <button class="item" onclick={() => (close(), saveTemplate())}>
+                <Icon name="template" /> Guardar como modelo
+              </button>
               <button class="item" onclick={() => (close(), (historyOpen = true))}>
                 <Icon name="history" /> Histórico
               </button>
