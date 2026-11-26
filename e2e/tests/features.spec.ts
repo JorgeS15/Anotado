@@ -243,3 +243,17 @@ test('checklist sub-items with Tab, kept on other devices and in the Markdown ex
   await expect(card(pc.page, 'Talho e peixaria').locator('li.sub')).toHaveCount(2);
   await pc.context.close();
 });
+
+test('signing out the other devices sends them to the login screen', async ({ page, browser }) => {
+  await login(page);
+  const phone = await newDevice(browser);
+  page.once('dialog', (d) => d.accept());
+  await page.click('[aria-label="Menu"]');
+  await page.click('text=Terminar sessão nos outros dispositivos');
+  await expect(page.locator('.toast')).toContainText('outros dispositivos');
+  await expect(phone.page.locator('#password')).toBeVisible({ timeout: 20_000 });
+  // This device keeps working.
+  await page.reload();
+  await expect(page.locator('.search input')).toBeVisible();
+  await phone.context.close();
+});

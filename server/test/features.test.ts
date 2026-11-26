@@ -167,3 +167,17 @@ test('forwarded addresses are ignored for the login limit unless the proxy is tr
     assert.equal(status, trustProxy ? 401 : 429);
   }
 });
+
+test('signing out other devices revokes their sessions but keeps this one and the API token', async () => {
+  const { call, json, bearer, store } = setup();
+  const loginCookie = async () => (await json('/api/login', 'POST', { password: 'pw' })).headers.get('set-cookie')!.split(';')[0];
+  const phone = await loginCookie();
+  const pc = await loginCookie();
+  const res = await call('/api/logout-others', { method: 'POST', headers: { cookie: pc } });
+  assert.equal(res.status, 200);
+  const renewed = res.headers.get('set-cookie')!.split(';')[0];
+  assert.equal((await call('/api/notes', { headers: { cookie: phone } })).status, 401);
+  assert.equal((await call('/api/notes', { headers: { cookie: renewed } })).status, 200);
+  assert.equal((await call('/api/notes', { headers: bearer })).status, 200);
+  assert.equal(store.getMeta('session_epoch'), '1');
+});

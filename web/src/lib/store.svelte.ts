@@ -210,6 +210,16 @@ class NoteStore {
     this.setAuth(false);
   }
 
+  /** Signs out every other device (e.g. a lost phone). This one stays signed in. */
+  async logoutOthers(): Promise<string> {
+    try {
+      await api('/api/logout-others', { method: 'POST' });
+      return 'Sessão terminada nos outros dispositivos.';
+    } catch {
+      return 'Não foi possível (sem ligação ao servidor?).';
+    }
+  }
+
   private setAuth(authenticated: boolean) {
     rememberAuth(authenticated);
     this.auth = authenticated ? 'yes' : 'no';
@@ -476,10 +486,16 @@ class NoteStore {
     });
     source.addEventListener('error', () => {
       if (source.readyState === EventSource.CLOSED) {
-        // The browser gave up (e.g. 401 or server down); retry manually.
+        // The browser gave up (e.g. 401 or server down). If the session was revoked, show the
+        // login screen now; otherwise retry later (never reconnect at once, to avoid a loop).
         this.events = undefined;
         this.online = false;
-        this.startRetry();
+        api<{ authenticated: boolean }>('/api/session')
+          .then(({ authenticated }) => {
+            if (!authenticated) this.setAuth(false);
+            else this.startRetry();
+          })
+          .catch(() => this.startRetry());
       }
     });
   }

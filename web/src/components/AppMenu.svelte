@@ -30,6 +30,7 @@
     onserver,
     onshortcuts,
     onlogout,
+    onlogoutothers,
   }: {
     view: View;
     counts: { archive: number; trash: number };
@@ -44,6 +45,7 @@
     onserver: () => void;
     onshortcuts: () => void;
     onlogout: () => void;
+    onlogoutothers: () => void;
   } = $props();
 
   let open = $state(false);
@@ -93,6 +95,9 @@
     <hr />
     <button class="item" onclick={() => (close(), onshortcuts())}><Icon name="keyboard" /> Atalhos de teclado</button>
     <button class="item" onclick={() => (close(), onlogout())}><Icon name="logout" /> Terminar sessão</button>
+    <button class="item" onclick={() => (close(), onlogoutothers())}>
+      <Icon name="logout" /> Terminar sessão nos outros dispositivos
+    </button>
     {#if store.newVersion}
       <a class="item new-version" href={store.newVersion.url} target="_blank" rel="noopener noreferrer">
         <Icon name="update" /> Nova versão: v{store.newVersion.version}

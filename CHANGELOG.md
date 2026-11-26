@@ -14,6 +14,7 @@ e as versões seguem [Semantic Versioning](https://semver.org/lang/pt-PT/).
 - **Automações**: com `ANOTADO_API_TOKEN`, o Home Assistant, os Atalhos do iPhone ou o Tasker podem criar notas (`POST /api/notes`) e acrescentar itens a uma checklist pelo nome (`POST /api/lists/items`). Guia em `docs/automacoes.md`, com exemplos para o Home Assistant, incluindo voz com o Assist.
 - **Aviso de versão nova** no menu: o servidor consulta uma vez por dia a última release no GitHub (`UPDATE_CHECK=false` desliga).
 - **Ordem manual das notas**: Ordenar → Manual (arrastar). Arrasta uma nota pela pega à esquerda, ou move-a com `Alt` + setas. A ordem é partilhada pelos dispositivos.
+- **Terminar sessão nos outros dispositivos** (Menu), por exemplo depois de perder o telemóvel. Este dispositivo continua com sessão, e as alterações por sincronizar nos outros não se perdem: são enviadas depois de voltarem a entrar.
 - Exportar uma nota em Markdown e imprimi-la (também com `Ctrl`+`P`).
 - Tamanho da letra (pequeno, normal, grande), no menu.
 - Atalhos de teclado: `?` mostra a lista, `Ctrl`+`Enter` fecha a nota, `Alt`+`↑`/`↓` move um item da checklist e `Ctrl`+`Espaço` marca-o.

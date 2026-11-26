@@ -378,6 +378,13 @@
     if (file) notify(await store.importBackup(file));
   }
 
+  async function logoutOthers() {
+    const question =
+      'Terminar a sessão em todos os outros dispositivos? Vão pedir a password outra vez. ' +
+      'As alterações que ainda não sincronizaram ficam guardadas neles e são enviadas depois de entrar.';
+    if (confirm(question)) notify(await store.logoutOthers());
+  }
+
   function logout() {
     if (store.pending && !confirm('Há alterações por sincronizar que se vão perder. Terminar sessão mesmo assim?'))
       return;
@@ -436,7 +443,8 @@
       oncolornames={() => (sheet = 'colornames')}
       onserver={() => (sheet = 'server')}
       onshortcuts={() => (sheet = 'shortcuts')}
-      onlogout={logout} />
+      onlogout={logout}
+      onlogoutothers={logoutOthers} />
     <input type="file" accept="application/json,.json" hidden bind:this={importEl} onchange={importBackup} />
   </header>
   {/if}

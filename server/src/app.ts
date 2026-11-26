@@ -26,7 +26,9 @@ export type ServerEvent =
   | { type: 'upsert'; note: Note }
   | { type: 'delete'; id: string }
   | { type: 'reload' }
-  | { type: 'settings'; settings: Settings };
+  | { type: 'settings'; settings: Settings }
+  /** Sessions were revoked: live connections of signed-out devices close. */
+  | { type: 'sessions' };
 
 export interface AppOptions {
   store: Store;
@@ -61,7 +63,7 @@ export function createApp({
   updates,
 }: AppOptions) {
   const app = new Hono();
-  const sessions = new Sessions(secret, password);
+  const sessions = new Sessions(secret, password, Number(store.getMeta('session_epoch') ?? 0) || 0);
   const limiter = new LoginLimiter();
   const listeners = new Set<(event: ServerEvent) => void>();
 
@@ -162,6 +164,16 @@ export function createApp({
       return c.json({ error: 'unauthorized' }, 401);
     }
     await next();
+  });
+
+  /** Signs out every other device: their sessions stop working; this one gets a new session. */
+  app.post('/api/logout-others', (c) => {
+    const epoch = (Number(store.getMeta('session_epoch') ?? 0) || 0) + 1;
+    store.setMeta('session_epoch', String(epoch));
+    sessions.setEpoch(epoch);
+    issueSession(c);
+    broadcast({ type: 'sessions' });
+    return c.json({ ok: true });
   });
 
   app.get('/api/notes', (c) => c.json({ notes: store.all(), now: Date.now() }));
@@ -375,7 +387,18 @@ export function createApp({
     streamSSE(c, async (stream) => {
       const queue: ServerEvent[] = [];
       let wake: (() => void) | undefined;
+      const cookie = getCookie(c, SESSION_COOKIE);
+      const viaToken = !sessions.verify(cookie);
       const listener = (event: ServerEvent) => {
+        if (event.type === 'sessions') {
+          // A device whose session was revoked must not keep receiving notes.
+          if (!viaToken && !sessions.verify(cookie)) {
+            listeners.delete(listener);
+            stream.abort();
+            wake?.();
+          }
+          return;
+        }
         queue.push(event);
         wake?.();
       };
