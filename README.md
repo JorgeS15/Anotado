@@ -11,7 +11,7 @@ Notas simples e coloridas, ao estilo do ColorNote, para usar no PC e no telemóv
 
 - Notas de **texto** e **checklist**
 - **9 cores** que servem de categorias, com filtro por cor e **nomes para as cores** (ex.: verde = "Compras")
-- Checklists com "Desmarcar tudo", "Apagar concluídos" e concluídos recolhíveis
+- Checklists com sub-itens, "Desmarcar tudo", "Apagar concluídos" e concluídos recolhíveis
 - **Modelos** de notas (ex.: lista de compras base)
 - Fixar, arquivar e lixo (as notas no lixo são apagadas ao fim de 30 dias, configurável)
 - Pesquisa (ignora acentos), vista em grelha ou em lista, ordenação, tamanho da letra
@@ -162,7 +162,7 @@ e Tasker, está em [docs/automacoes.md](docs/automacoes.md).
 | `Ctrl`+`Enter` | Fechar a nota                       |
 | `Ctrl`+`P`     | Imprimir a nota aberta              |
 
-Nas checklists, `Enter` cria um novo item, `Backspace` num item vazio apaga-o, `Alt`+`↑`/`↓` move o
+Nas checklists, `Enter` cria um novo item, `Tab` torna-o sub-item, `Backspace` num item vazio apaga-o, `Alt`+`↑`/`↓` move o
 item e `Ctrl`+`Espaço` marca-o. `Ctrl`+clique numa nota seleciona-a; `Esc` cancela a seleção.
 
 ## Desenvolvimento

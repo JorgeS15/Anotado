@@ -11,7 +11,7 @@ O Anotado quer continuar a ser **simples**: uma ideia só entra se não complica
 
 ## Feito na 1.2.0
 
-Nomes para as cores, ordem manual das notas, ações em bloco e concluídos recolhíveis nas checklists, modelos de notas, ecrã
+Nomes para as cores, ordem manual das notas, sub-itens e concluídos recolhíveis nas checklists, modelos de notas, ecrã
 "Servidor e backups" com restauro, `TRASH_DAYS`, `TRUST_PROXY`, barra do sistema com a cor da nota,
 atalhos novos com ajuda (`?`), tamanho da letra, exportar e imprimir uma nota, aviso de versão nova,
 token de API para automações com guia para o Home Assistant, README em inglês com capturas de ecrã,
@@ -30,26 +30,25 @@ CI de volta ao `ubuntu-latest` e o `App.svelte` dividido em componentes. Detalhe
 | # | O quê | Porquê | Esforço |
 |---|---|---|---|
 | 4 | **Rever a app com um leitor de ecrã** | Os diálogos já prendem o foco, os menus usam as setas e notas e itens movem-se com `Alt`+setas; falta experimentar com o TalkBack e o NVDA e corrigir o que for anunciado mal. | P–M |
-| 5 | **Sub-itens na checklist** (indentação) | Agrupar, por exemplo, "Talho → frango, carne picada". | M |
 
 ## Integrações
 
 | # | O quê | Porquê | Esforço |
 |---|---|---|---|
-| 6 | **Checklists como listas de tarefas do Home Assistant** (integração *todo*) | Verias e marcarias a lista de compras no painel do Home Assistant. Exige uma integração própria em Python; a API para isso já existe. | G |
+| 5 | **Checklists como listas de tarefas do Home Assistant** (integração *todo*) | Verias e marcarias a lista de compras no painel do Home Assistant. Exige uma integração própria em Python; a API para isso já existe. | G |
 
 ## Depois — funcionalidades maiores (1.4+)
 
 | # | O quê | Porquê | Esforço |
 |---|---|---|---|
-| 7 | **Lembretes com notificação** | É a maior funcionalidade do ColorNote que falta. Numa PWA exige Web Push enviado pelo servidor, com chaves VAPID e permissão de notificações. | G |
-| 8 | **Vista de calendário** | Notas por dia de criação ou de lembrete, como no ColorNote. Faz mais sentido depois dos lembretes. | M |
-| 9 | **Interface em inglês** (e outras línguas) | A interface só existe em português. Num projeto público, a língua seguiria a do browser. | M |
-| 10 | **Backups fora do servidor** (WebDAV, S3 ou uma pasta sincronizada) | Hoje os backups ficam no mesmo disco que a base de dados: se o disco falhar, perde-se tudo. | M |
-| 11 | **Mudar a password e terminar outras sessões a partir da app** | Hoje a password só se muda na variável de ambiente, o que termina todas as sessões. | M |
-| 12 | **Bloquear notas com PIN** | Esconde notas sensíveis de quem pega no telemóvel. É só um bloqueio visual, não encripta os dados. | M |
-| 13 | **Imagens nas notas** | Fotos de recibos, quadros ou receitas. Exige guardar ficheiros, sincronizá-los e incluí-los nos backups. | G |
-| 14 | **Formatação simples** (negrito, listas com marcadores) | Só se for possível sem complicar o editor. | M |
+| 6 | **Lembretes com notificação** | É a maior funcionalidade do ColorNote que falta. Numa PWA exige Web Push enviado pelo servidor, com chaves VAPID e permissão de notificações. | G |
+| 7 | **Vista de calendário** | Notas por dia de criação ou de lembrete, como no ColorNote. Faz mais sentido depois dos lembretes. | M |
+| 8 | **Interface em inglês** (e outras línguas) | A interface só existe em português. Num projeto público, a língua seguiria a do browser. | M |
+| 9 | **Backups fora do servidor** (WebDAV, S3 ou uma pasta sincronizada) | Hoje os backups ficam no mesmo disco que a base de dados: se o disco falhar, perde-se tudo. | M |
+| 10 | **Mudar a password e terminar outras sessões a partir da app** | Hoje a password só se muda na variável de ambiente, o que termina todas as sessões. | M |
+| 11 | **Bloquear notas com PIN** | Esconde notas sensíveis de quem pega no telemóvel. É só um bloqueio visual, não encripta os dados. | M |
+| 12 | **Imagens nas notas** | Fotos de recibos, quadros ou receitas. Exige guardar ficheiros, sincronizá-los e incluí-los nos backups. | G |
+| 13 | **Formatação simples** (negrito, listas com marcadores) | Só se for possível sem complicar o editor. | M |
 
 ## Fora do âmbito (por agora)
 

@@ -217,3 +217,29 @@ test('dragging a checklist item saves the new order', async ({ page, browser }) 
   expect(await itemTexts(pc.page)).toEqual(['Terceiro', 'Primeiro', 'Segundo']);
   await pc.context.close();
 });
+
+test('checklist sub-items with Tab, kept on other devices and in the Markdown export', async ({ page, browser }) => {
+  await login(page);
+  await createChecklist(page, 'Talho e peixaria', ['Talho', 'Frango']);
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('Carne picada');
+  await expect(page.locator('.editor li.sub')).toHaveCount(2);
+  await page.keyboard.press('Shift+Tab');
+  await expect(page.locator('.editor li.sub')).toHaveCount(1);
+  await page.keyboard.press('Tab');
+
+  await page.click('header button[title="Mais opções"]');
+  const download = page.waitForEvent('download');
+  await page.locator('.panel .item', { hasText: 'Descarregar (.md)' }).click();
+  const file = await download;
+  expect(file.suggestedFilename()).toBe('talho-e-peixaria.md');
+  const text = await (await file.createReadStream()).toArray();
+  expect(Buffer.concat(text).toString()).toBe('# Talho e peixaria\n\n- [ ] Talho\n  - [ ] Frango\n  - [ ] Carne picada\n');
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+
+  const pc = await newDevice(browser);
+  await expect(card(pc.page, 'Talho e peixaria').locator('li.sub')).toHaveCount(2);
+  await pc.context.close();
+});

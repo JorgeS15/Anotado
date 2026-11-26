@@ -3,7 +3,7 @@ import type { Note } from './types';
 /** The note as Markdown: title as a heading, checklist items as task list items. */
 export function toMarkdown(note: Note): string {
   const body =
-    note.type === 'checklist' ? note.items.map((i) => `- [${i.done ? 'x' : ' '}] ${i.text}`).join('\n') : note.content;
+    note.type === 'checklist' ? note.items.map((i) => `${i.indent ? '  ' : ''}- [${i.done ? 'x' : ' '}] ${i.text}`).join('\n') : note.content;
   return (note.title ? `# ${note.title}\n\n${body}` : body).trimEnd() + '\n';
 }
 
@@ -37,7 +37,7 @@ function escape(text: string): string {
 export function printNote(note: Note) {
   const body =
     note.type === 'checklist'
-      ? `<ul>${note.items.map((i) => `<li class="${i.done ? 'done' : ''}">${i.done ? '☑' : '☐'} ${escape(i.text)}</li>`).join('')}</ul>`
+      ? `<ul>${note.items.map((i) => `<li class="${i.done ? 'done' : ''}${i.indent ? ' sub' : ''}">${i.done ? '☑' : '☐'} ${escape(i.text)}</li>`).join('')}</ul>`
       : `<div class="text">${escape(note.content)}</div>`;
   const html = `<!doctype html><html lang="pt-PT"><head><meta charset="utf-8"><title>${escape(note.title || 'Nota')}</title>
 <style>
@@ -46,6 +46,7 @@ export function printNote(note: Note) {
   .text { white-space: pre-wrap; overflow-wrap: anywhere; }
   ul { list-style: none; padding: 0; margin: 0; }
   li { padding: 2pt 0; }
+  li.sub { padding-left: 1.5em; }
   li.done { color: #666; text-decoration: line-through; }
 </style></head><body>${note.title ? `<h1>${escape(note.title)}</h1>` : ''}${body}</body></html>`;
   const frame = document.createElement('iframe');

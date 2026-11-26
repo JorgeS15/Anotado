@@ -148,7 +148,7 @@
   {#if note.type === 'checklist'}
     <ul>
       {#each shown as item (item.id)}
-        <li class:done={item.done}>
+        <li class:done={item.done} class:sub={item.indent === 1}>
           <Icon name={item.done ? 'boxChecked' : 'box'} size={16} />
           <span>{@render marked(item.text)}</span>
         </li>
@@ -307,6 +307,10 @@
     display: flex;
     gap: 6px;
     align-items: flex-start;
+  }
+
+  li.sub {
+    padding-left: 18px;
   }
 
   li :global(svg) {

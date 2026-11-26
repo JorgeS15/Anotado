@@ -14,7 +14,7 @@ Self-hosted with Docker, single user, works offline. The interface is in Portugu
 
 - **Text** and **checklist** notes
 - **9 colours** used as categories, with a colour filter and **colour names** (e.g. green = "Groceries")
-- Checklists with "uncheck all", "delete done" and collapsible done items
+- Checklists with sub-items, "uncheck all", "delete done" and collapsible done items
 - Note **templates** (e.g. a base shopping list)
 - Pin, archive and trash (notes in the trash are deleted after 30 days, configurable)
 - Search (accent-insensitive), grid or list view, sorting, font size
@@ -145,7 +145,7 @@ The full guide, with Home Assistant examples (`rest_command`, and voice with Ass
 ## Keyboard shortcuts
 
 `N` new note · `L` new checklist · `/` search · `?` show shortcuts · `Esc` or `Ctrl`+`Enter` close
-the note · `Ctrl`+`P` print it. In checklists: `Enter` new item, `Alt`+`↑`/`↓` move it,
+the note · `Ctrl`+`P` print it. In checklists: `Enter` new item, `Tab` sub-item, `Alt`+`↑`/`↓` move it,
 `Ctrl`+`Space` tick it.
 
 ## Development

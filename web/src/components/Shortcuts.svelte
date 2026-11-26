@@ -28,6 +28,7 @@
       keys: [
         ['Enter', 'Novo item (divide o item no cursor)'],
         ['Backspace', 'Num item vazio, apaga-o; no início, junta-o ao anterior'],
+        ['Tab', 'Tornar o item um sub-item (Shift + Tab desfaz)'],
         ['Alt + ↑ / ↓', 'Mover o item'],
         ['Ctrl + Espaço', 'Marcar ou desmarcar o item'],
       ],

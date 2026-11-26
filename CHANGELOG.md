@@ -8,6 +8,7 @@ e as versões seguem [Semantic Versioning](https://semver.org/lang/pt-PT/).
 ### Added
 - **Nomes para as cores** (Menu → Nomes das cores): por exemplo, verde = "Compras". Aparecem no filtro e ao escolher a cor, e são partilhados por todos os dispositivos.
 - **Checklists**: "Desmarcar tudo" e "Apagar concluídos" (com Anular) no menu da nota, e os itens concluídos podem ser recolhidos num toque.
+- **Sub-itens nas checklists**: `Tab` num item torna-o sub-item do de cima (`Shift`+`Tab` desfaz); no telemóvel, arrasta-o pela pega para a direita ou para a esquerda. Aparecem indentados no cartão, no Markdown e na impressão.
 - **Modelos de notas**: Mais opções → Guardar como modelo; as notas novas a partir de um modelo saem do botão +, com os itens por marcar. Gerir modelos no mesmo menu.
 - **Servidor e backups** (Menu): número de notas, espaço ocupado, versão, e a lista dos backups diários, que se podem descarregar ou restaurar. Restaurar repõe as notas como estavam nesse dia; a versão atual de cada nota fica no histórico.
 - **Automações**: com `ANOTADO_API_TOKEN`, o Home Assistant, os Atalhos do iPhone ou o Tasker podem criar notas (`POST /api/notes`) e acrescentar itens a uma checklist pelo nome (`POST /api/lists/items`). Guia em `docs/automacoes.md`, com exemplos para o Home Assistant, incluindo voz com o Assist.

@@ -17,6 +17,8 @@ export interface ChecklistItem {
   id: string;
   text: string;
   done: boolean;
+  /** 1 for a sub-item of the item above it. Left out for top-level items. */
+  indent?: 1;
 }
 
 export interface Note {
@@ -75,6 +77,7 @@ export function validateNote(input: unknown): Note {
       id: validateId(item.id),
       text: str(item.text, `items[${i}].text`, 10_000),
       done: item.done === true,
+      ...(item.indent === 1 && { indent: 1 as const }),
     };
   });
 

@@ -19,6 +19,8 @@ export interface ChecklistItem {
   id: string;
   text: string;
   done: boolean;
+  /** 1 for a sub-item of the item above it. */
+  indent?: 1;
 }
 
 export interface Note {
