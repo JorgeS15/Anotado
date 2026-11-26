@@ -330,7 +330,7 @@
           oninput={changed}
           readonly={trashed}
           onkeydown={(e) => {
-            if (e.key === 'Enter') {
+            if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) {
               e.preventDefault();
               if (note.type === 'text') contentEl?.focus();
             }

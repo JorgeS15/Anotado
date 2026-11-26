@@ -117,6 +117,10 @@ class NoteStore {
   private flushAgain = false;
   private events: EventSource | undefined;
   private retryTimer: ReturnType<typeof setInterval> | undefined;
+  /** When each note last changed from a live event, so an older full sync does not undo it. */
+  private liveSeq = 0;
+  private liveChanges = new Map<string, number>();
+  private pulls = 0;
 
   async init() {
     try {
@@ -385,7 +389,11 @@ class NoteStore {
 
   /** Fetches the full server state and reconciles it with local data. */
   async pull() {
+    const startedAt = this.liveSeq;
+    // Changed by a live event after the request started: the response is older than what we have.
+    const newer = (id: string) => (this.liveChanges.get(id) ?? 0) > startedAt;
     let serverNotes: Note[];
+    this.pulls++;
     try {
       serverNotes = (await api<{ notes: Note[] }>('/api/notes')).notes;
       this.online = true;
@@ -393,12 +401,14 @@ class NoteStore {
       if (err instanceof HttpError && err.status === 401) this.setAuth(false);
       else this.online = false;
       return;
+    } finally {
+      this.pulls--;
     }
     const seen = new Set<string>();
     const toStore: Note[] = [];
     for (const note of serverNotes) {
       seen.add(note.id);
-      if (this.hasPending(note.id)) continue;
+      if (this.hasPending(note.id) || newer(note.id)) continue;
       const local = this.notes[note.id];
       if (!local || local.updated_at !== note.updated_at || local.synced !== note.updated_at) {
         note.synced = note.updated_at;
@@ -407,7 +417,9 @@ class NoteStore {
       }
     }
     // Notes deleted on another device.
-    const removed = Object.keys(this.notes).filter((id) => !seen.has(id) && !this.hasPending(id));
+    const removed = Object.keys(this.notes).filter((id) => !seen.has(id) && !this.hasPending(id) && !newer(id));
+    // Forget live changes no running sync still needs.
+    if (!this.pulls) this.liveChanges.clear();
     for (const id of removed) delete this.notes[id];
     await Promise.all([
       setMany(
@@ -425,6 +437,7 @@ class NoteStore {
     if (!force && local && local.updated_at > note.updated_at) return;
     note.synced = note.updated_at;
     this.notes[note.id] = note;
+    this.liveChanges.set(note.id, ++this.liveSeq);
     set(note.id, note, notesDb).catch(() => {});
   }
 
@@ -449,6 +462,7 @@ class NoteStore {
       const event = JSON.parse((e as MessageEvent).data);
       if (event.type === 'upsert') this.applyRemote(event.note);
       else if (event.type === 'delete' && !this.hasPending(event.id)) {
+        this.liveChanges.set(event.id, ++this.liveSeq);
         delete this.notes[event.id];
         del(event.id, notesDb).catch(() => {});
       } else if (event.type === 'reload') this.pull();

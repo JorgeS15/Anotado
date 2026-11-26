@@ -79,7 +79,7 @@
       e.preventDefault();
       toggle(item);
       focusItem(item.id);
-    } else if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+    } else if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.isComposing) {
       e.preventDefault();
       // At the item limit a split would drop the text after the cursor.
       if (full) return;
