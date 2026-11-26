@@ -20,6 +20,7 @@ import {
   type Note,
   type Settings,
 } from './notes.ts';
+import type { WebDavUploader } from './remote.ts';
 import type { UpdateChecker } from './updates.ts';
 
 export type ServerEvent =
@@ -47,6 +48,8 @@ export interface AppOptions {
   /** The SQLite file, to report its size. */
   dbFile?: string;
   updates?: UpdateChecker;
+  /** Copies backups to WebDAV, if configured. */
+  remote?: WebDavUploader;
 }
 
 export function createApp({
@@ -61,6 +64,7 @@ export function createApp({
   backupDir,
   dbFile,
   updates,
+  remote,
 }: AppOptions) {
   const app = new Hono();
   const sessions = new Sessions(secret, password, Number(store.getMeta('session_epoch') ?? 0) || 0);
@@ -271,6 +275,7 @@ export function createApp({
       db_size: dbSize,
       trash_days: trashDays,
       api_token: Boolean(apiToken),
+      remote: remote?.status ?? null,
       backups,
     });
   });

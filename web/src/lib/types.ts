@@ -105,6 +105,12 @@ export interface ServerStatus {
   db_size: number;
   trash_days: number;
   api_token: boolean;
+  /** Copy of the backups to WebDAV, if configured. */
+  remote: {
+    target: string;
+    last_ok?: { name: string; at: number };
+    last_error?: { message: string; at: number };
+  } | null;
   backups: BackupInfo[];
 }
 

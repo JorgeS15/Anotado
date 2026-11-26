@@ -3,8 +3,9 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createApp } from './app.ts';
 import { generateSecret } from './auth.ts';
-import { dailyBackup } from './backup.ts';
+import { dailyBackup, listBackups } from './backup.ts';
 import { Store } from './db.ts';
+import { WebDavUploader } from './remote.ts';
 import { UpdateChecker } from './updates.ts';
 
 const port = Number(process.env.PORT ?? 4008);
@@ -43,7 +44,10 @@ if (apiToken && (apiToken.length < 24 || apiToken === password)) {
 }
 
 const dbFile = resolve(dataDir, 'anotado.db');
-const backupDir = resolve(dataDir, 'backups');
+const backupDir = resolve(process.env.BACKUP_DIR || resolve(dataDir, 'backups'));
+const remote = process.env.BACKUP_WEBDAV_URL
+  ? new WebDavUploader(process.env.BACKUP_WEBDAV_URL, process.env.BACKUP_WEBDAV_USER, process.env.BACKUP_WEBDAV_PASSWORD)
+  : undefined;
 const store = new Store(dbFile);
 
 let secret = process.env.SESSION_SECRET || store.getMeta('session_secret');
@@ -65,6 +69,7 @@ const { app, broadcast } = createApp({
   backupDir,
   dbFile,
   updates,
+  remote,
 });
 
 const purge = () => {
@@ -78,6 +83,14 @@ const backup = () => {
   try {
     const file = dailyBackup(store, backupDir, backupKeep);
     if (file) console.log(`Backup written: ${file}`);
+    // Send the newest backup to WebDAV; a failed upload is retried on the next hourly run.
+    const latest = listBackups(backupDir)[0];
+    if (remote && latest && remote.pending(latest.name)) {
+      void remote.upload(resolve(backupDir, latest.name)).then((ok) => {
+        if (ok) console.log(`Backup copied to ${remote.status.target}`);
+        else console.error(`Backup copy to ${remote.status.target} failed: ${remote.status.last_error?.message}`);
+      });
+    }
   } catch (err) {
     console.error('Backup failed:', err);
   }

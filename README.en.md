@@ -68,6 +68,9 @@ docker compose up -d
 | `PORT`              | no       | HTTP port (default `4008`).                                                 |
 | `SESSION_SECRET`    | no       | Session secret. If unset, one is generated and stored in the database.      |
 | `BACKUP_KEEP`       | no       | How many daily backups to keep (default `30`; `0` turns them off).          |
+| `BACKUP_DIR`        | no       | Folder for the daily backups (default `/data/backups`), e.g. another volume or a NAS. |
+| `BACKUP_WEBDAV_URL` | no       | WebDAV folder each daily backup is copied to (Nextcloud, a NAS…).           |
+| `BACKUP_WEBDAV_USER` / `BACKUP_WEBDAV_PASSWORD` | no | Credentials for the WebDAV folder.                     |
 | `TRASH_DAYS`        | no       | Days notes stay in the trash before being deleted (default `30`).          |
 | `ANOTADO_API_TOKEN` | no       | Token for automations (24+ characters). See [Automations](#automations).    |
 | `TRUST_PROXY`       | no       | `true` (default) behind a reverse proxy; `false` if the port is exposed directly. |
@@ -78,6 +81,10 @@ Data lives in `/data/anotado.db` (SQLite). A backup is written every day to
 `/data/backups/anotado-YYYY-MM-DD.json`. In **Menu → Servidor e backups** you can see them, download
 one, or restore your notes to how they were on that day (each note's current version stays in its
 history).
+
+Backups live on the same disk as the database. To keep a copy elsewhere, set `BACKUP_WEBDAV_URL`
+(for Nextcloud: `https://cloud.example.com/remote.php/dav/files/USER/Anotado/`, with an app password);
+each daily backup is copied there, and retried an hour later if it fails.
 
 The update check only asks the GitHub API for Anotado's latest public release; nothing about your
 server is sent.

@@ -18,6 +18,7 @@ e as versões seguem [Semantic Versioning](https://semver.org/lang/pt-PT/).
 - Exportar uma nota em Markdown e imprimi-la (também com `Ctrl`+`P`).
 - Tamanho da letra (pequeno, normal, grande), no menu.
 - Atalhos de teclado: `?` mostra a lista, `Ctrl`+`Enter` fecha a nota, `Alt`+`↑`/`↓` move um item da checklist e `Ctrl`+`Espaço` marca-o.
+- **Backups fora do servidor**: `BACKUP_WEBDAV_URL` (com `BACKUP_WEBDAV_USER` e `BACKUP_WEBDAV_PASSWORD`) copia cada backup diário para uma pasta WebDAV, como o Nextcloud ou um NAS, e `BACKUP_DIR` muda a pasta dos backups. O estado da cópia aparece em Servidor e backups.
 - `TRASH_DAYS` define quantos dias as notas ficam no lixo (por omissão 30).
 - `TRUST_PROXY=false` faz o limite de tentativas de login ignorar `X-Forwarded-For`, para quem expõe a porta sem proxy.
 - README em inglês, com capturas de ecrã.

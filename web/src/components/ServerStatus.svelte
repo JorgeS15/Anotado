@@ -77,6 +77,24 @@
     </p>
 
     <h3>Backups diários</h3>
+    {#if status.remote}
+      <p class="info" class:remote-error={status.remote.last_error}>
+        Cópia para <code>{status.remote.target}</code>:
+        {#if status.remote.last_error}
+          falhou {formatFull(status.remote.last_error.at)} ({status.remote.last_error.message}). Tenta outra vez dentro
+          de uma hora.
+        {:else if status.remote.last_ok}
+          última enviada {formatFull(status.remote.last_ok.at)}.
+        {:else}
+          ainda nenhuma enviada.
+        {/if}
+      </p>
+    {:else}
+      <p class="info">
+        Os backups ficam no disco do servidor. Para guardar uma cópia noutro sítio, define
+        <code>BACKUP_WEBDAV_URL</code> (Nextcloud, NAS…) ou <code>BACKUP_DIR</code>.
+      </p>
+    {/if}
     {#if !status.backups.length}
       <p class="info">
         Ainda não há backups. O servidor escreve um por dia em <code>/data/backups</code> (a não ser que
@@ -111,7 +129,8 @@
     margin: 8px 0;
   }
 
-  .error {
+  .error,
+  .remote-error {
     color: var(--danger);
   }
 

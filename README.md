@@ -68,6 +68,9 @@ docker compose up -d
 | `PORT`             | não         | Porta HTTP (por omissão `4008`).                                             |
 | `SESSION_SECRET`   | não         | Segredo das sessões. Se não for definido, é gerado e guardado na base de dados. |
 | `BACKUP_KEEP`      | não         | Quantos backups diários guardar (por omissão `30`; `0` desliga).             |
+| `BACKUP_DIR`       | não         | Pasta dos backups diários (por omissão `/data/backups`). Pode ser outro volume, por exemplo um NAS. |
+| `BACKUP_WEBDAV_URL` | não        | Pasta WebDAV para onde copiar cada backup diário (Nextcloud, NAS…). Ver abaixo. |
+| `BACKUP_WEBDAV_USER` / `BACKUP_WEBDAV_PASSWORD` | não | Credenciais da pasta WebDAV. |
 | `TRASH_DAYS`       | não         | Dias que as notas ficam no lixo antes de serem apagadas (por omissão `30`).  |
 | `ANOTADO_API_TOKEN` | não        | Token para automações (24+ caracteres). Ver [Automações](docs/automacoes.md). |
 | `TRUST_PROXY`      | não         | `true` (por omissão) atrás do Caddy; `false` se a porta estiver exposta diretamente. |
@@ -78,6 +81,20 @@ Os dados ficam em `/data/anotado.db` (SQLite). Todos os dias é escrito um backu
 `/data/backups/anotado-AAAA-MM-DD.json` (os últimos 30 são mantidos). Em **Menu → Servidor e backups**
 vês a lista, descarregas um backup ou restauras as notas como estavam nesse dia (a versão atual de cada
 nota fica no histórico). Também podes copiar a pasta `data` ou usar **Menu → Exportar backup**.
+
+#### Cópia dos backups para fora do servidor
+
+Os backups ficam no mesmo disco que a base de dados. Para os guardar também noutro sítio, indica
+uma pasta WebDAV; cada backup diário é lá copiado (e reenviado na hora seguinte se falhar):
+
+```yaml
+      BACKUP_WEBDAV_URL: https://nuvem.exemplo.pt/remote.php/dav/files/jorge/Anotado/
+      BACKUP_WEBDAV_USER: jorge
+      BACKUP_WEBDAV_PASSWORD: palavra-passe-de-aplicacao
+```
+
+No Nextcloud, cria antes a pasta `Anotado` e usa uma palavra-passe de aplicação
+(Definições → Segurança). O estado da última cópia aparece em **Menu → Servidor e backups**.
 
 A verificação de versões só pede a última release pública do Anotado à API do GitHub; não envia
 nada sobre o teu servidor.
