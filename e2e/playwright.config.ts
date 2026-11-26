@@ -18,6 +18,8 @@ export default defineConfig({
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {
     baseURL: `http://localhost:${PORT}`,
+    // The interface follows the browser's language; most tests read the Portuguese texts.
+    locale: 'pt-PT',
     trace: 'retain-on-failure',
   },
   projects: [

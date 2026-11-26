@@ -1,3 +1,4 @@
+import { t, tn } from './i18n';
 import { createStore, del, delMany, entries, set, setMany, values } from 'idb-keyval';
 import { clientId, now, syncClock } from './clock';
 import { COLOR_LABELS, type Color, type ColorNotePreview, type Note, type NoteVersion, type ServerStatus, type Settings, type UpdateInfo } from './types';
@@ -186,13 +187,13 @@ class NoteStore {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        return body.error ?? 'Não foi possível entrar.';
+        return t(body.error ?? 'Não foi possível entrar.');
       }
       this.online = true;
       this.setAuth(true);
       return null;
     } catch {
-      return 'Sem ligação ao servidor.';
+      return t('Sem ligação ao servidor.');
     }
   }
 
@@ -216,9 +217,9 @@ class NoteStore {
   async logoutOthers(): Promise<string> {
     try {
       await api('/api/logout-others', { method: 'POST' });
-      return 'Sessão terminada nos outros dispositivos.';
+      return t('Sessão terminada nos outros dispositivos.');
     } catch {
-      return 'Não foi possível (sem ligação ao servidor?).';
+      return t('Não foi possível (sem ligação ao servidor?).');
     }
   }
 
@@ -379,8 +380,8 @@ class NoteStore {
                 // Never drop the edit: keep it on the device and in the outbox, and tell the user.
                 // A later edit replaces this entry and is sent again.
                 this.rejected[id] = /too long|too many/.test(err.message)
-                  ? 'A nota é demasiado grande para guardar no servidor. Encurta-a para voltar a sincronizar.'
-                  : `O servidor recusou esta nota (${err.message}). Fica guardada só neste dispositivo.`;
+                  ? t('A nota é demasiado grande para guardar no servidor. Encurta-a para voltar a sincronizar.')
+                  : t('O servidor recusou esta nota ({error}). Fica guardada só neste dispositivo.', { error: err.message });
                 keep = true;
               } else {
                 console.warn('Apagar recusado pelo servidor; ignorado.', entry, err);
@@ -553,8 +554,8 @@ class NoteStore {
       method: 'POST',
     });
     await this.pull();
-    if (!res.restored) return 'As notas já estavam iguais a este backup.';
-    return `${res.restored} ${res.restored === 1 ? 'nota restaurada' : 'notas restauradas'} do backup.`;
+    if (!res.restored) return t('As notas já estavam iguais a este backup.');
+    return tn(res.restored, '{n} nota restaurada do backup.', '{n} notas restauradas do backup.');
   }
 
   // --- Backup -----------------------------------------------------------------
@@ -573,7 +574,7 @@ class NoteStore {
       body: JSON.stringify({ records: preview.records, colors }),
     });
     await this.pull();
-    return `${res.imported} de ${res.total} notas importadas do ColorNote.`;
+    return t('{imported} de {total} notas importadas do ColorNote.', { imported: res.imported, total: res.total });
   }
 
   async importBackup(file: File): Promise<string> {
@@ -581,20 +582,20 @@ class NoteStore {
     try {
       data = JSON.parse(await file.text());
     } catch {
-      return 'O ficheiro não é um JSON válido.';
+      return t('O ficheiro não é um JSON válido.');
     }
     const notes = Array.isArray(data) ? data : (data as { notes?: unknown })?.notes;
-    if (!Array.isArray(notes)) return 'O ficheiro não parece ser um backup do Anotado.';
+    if (!Array.isArray(notes)) return t('O ficheiro não parece ser um backup do Anotado.');
     try {
       const res = await api<{ imported: number; total: number }>('/api/import', {
         method: 'POST',
         body: JSON.stringify({ notes }),
       });
       await this.pull();
-      return `${res.imported} de ${res.total} notas importadas.`;
+      return t('{imported} de {total} notas importadas.', { imported: res.imported, total: res.total });
     } catch (err) {
-      if (err instanceof HttpError && err.status === 400) return 'O backup contém dados inválidos.';
-      return 'Não foi possível importar (sem ligação?).';
+      if (err instanceof HttpError && err.status === 400) return t('O backup contém dados inválidos.');
+      return t('Não foi possível importar (sem ligação?).');
     }
   }
 }

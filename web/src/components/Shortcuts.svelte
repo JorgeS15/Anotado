@@ -1,42 +1,43 @@
 <script lang="ts">
+  import { t } from '../lib/i18n';
   import Sheet from './Sheet.svelte';
 
   let { onclose }: { onclose: () => void } = $props();
 
   const GROUPS: { title: string; keys: [string, string][] }[] = [
     {
-      title: 'Na lista de notas',
+      title: t('Na lista de notas'),
       keys: [
-        ['N', 'Nova nota de texto'],
-        ['L', 'Nova checklist'],
-        ['/', 'Pesquisar'],
-        ['Esc', 'Limpar a pesquisa'],
-        ['Ctrl + clique', 'Selecionar uma nota'],
-        ['?', 'Mostrar estes atalhos'],
+        ['N', t('Nova nota de texto')],
+        ['L', t('Nova checklist')],
+        ['/', t('Pesquisar')],
+        ['Esc', t('Limpar a pesquisa')],
+        [t('Ctrl + clique'), t('Selecionar uma nota')],
+        ['?', t('Mostrar estes atalhos')],
       ],
     },
     {
-      title: 'Numa nota',
+      title: t('Numa nota'),
       keys: [
-        ['Esc', 'Fechar'],
-        ['Ctrl + Enter', 'Fechar'],
-        ['Ctrl + P', 'Imprimir'],
+        ['Esc', t('Fechar')],
+        ['Ctrl + Enter', t('Fechar')],
+        ['Ctrl + P', t('Imprimir')],
       ],
     },
     {
-      title: 'Numa checklist',
+      title: t('Numa checklist'),
       keys: [
-        ['Enter', 'Novo item (divide o item no cursor)'],
-        ['Backspace', 'Num item vazio, apaga-o; no início, junta-o ao anterior'],
-        ['Tab', 'Tornar o item um sub-item (Shift + Tab desfaz)'],
-        ['Alt + ↑ / ↓', 'Mover o item'],
-        ['Ctrl + Espaço', 'Marcar ou desmarcar o item'],
+        ['Enter', t('Novo item (divide o item no cursor)')],
+        ['Backspace', t('Num item vazio, apaga-o; no início, junta-o ao anterior')],
+        ['Tab', t('Tornar o item um sub-item (Shift + Tab desfaz)')],
+        ['Alt + ↑ / ↓', t('Mover o item')],
+        [t('Ctrl + Espaço'), t('Marcar ou desmarcar o item')],
       ],
     },
   ];
 </script>
 
-<Sheet title="Atalhos de teclado" {onclose}>
+<Sheet title={t('Atalhos de teclado')} {onclose}>
   {#each GROUPS as group (group.title)}
     <h3>{group.title}</h3>
     <dl>

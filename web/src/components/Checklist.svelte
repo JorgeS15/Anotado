@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t, tn } from '../lib/i18n';
   import { tick } from 'svelte';
   import { autogrow } from '../lib/autogrow';
   import { LIMITS, formatCount } from '../lib/limits';
@@ -188,7 +189,7 @@
       type="button"
       role="checkbox"
       aria-checked={item.done}
-      aria-label={item.done ? 'Desmarcar' : 'Marcar como feito'}
+      aria-label={item.done ? t('Desmarcar') : t('Marcar como feito')}
       disabled={readonly}
       onclick={() => toggle(item)}>
       <Icon name={item.done ? 'boxChecked' : 'box'} />
@@ -200,11 +201,11 @@
       bind:value={item.text}
       use:autogrow={item.text}
       {readonly}
-      placeholder="Item"
+      placeholder={t('Item')}
       oninput={onchange}
       onkeydown={(e) => onkeydown(e, item)}></textarea>
     {#if !readonly}
-      <button class="remove" type="button" aria-label="Remover item" onclick={() => remove(item)}>
+      <button class="remove" type="button" aria-label={t('Remover item')} onclick={() => remove(item)}>
         <Icon name="close" size={18} />
       </button>
     {/if}
@@ -220,10 +221,10 @@
 
   {#if !readonly}
     {#if full}
-      <p class="full">Limite de {formatCount(LIMITS.items)} itens atingido.</p>
+      <p class="full">{t('Limite de {max} itens atingido.', { max: formatCount(LIMITS.items) })}</p>
     {:else}
       <button class="add" type="button" onclick={() => add()}>
-        <Icon name="plus" size={20} /> Adicionar item
+        <Icon name="plus" size={20} /> {t('Adicionar item')}
       </button>
     {/if}
   {/if}
@@ -232,10 +233,10 @@
     {#if ontogglehidden}
       <button class="done-label toggle" type="button" aria-expanded={!hideDone} onclick={ontogglehidden}>
         <span class="chevron" class:closed={hideDone}><Icon name="chevron" size={16} /></span>
-        {done.length} {done.length === 1 ? 'item concluído' : 'itens concluídos'}
+        {tn(done.length, '{n} item concluído', '{n} itens concluídos')}
       </button>
     {:else}
-      <p class="done-label">{done.length} {done.length === 1 ? 'item concluído' : 'itens concluídos'}</p>
+      <p class="done-label">{tn(done.length, '{n} item concluído', '{n} itens concluídos')}</p>
     {/if}
     {#if !hideDone}
       <ul>

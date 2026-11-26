@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t, tn } from '../lib/i18n';
   import { store } from '../lib/store.svelte';
   import type { Template } from '../lib/types';
   import Icon from './Icon.svelte';
@@ -10,36 +11,39 @@
     const before = $state.snapshot(store.settings.templates);
     store.saveSettings({
       ...$state.snapshot(store.settings),
-      templates: before.filter((t) => t.id !== template.id),
+      templates: before.filter((tpl) => tpl.id !== template.id),
     });
-    notify(`Modelo "${template.name}" apagado`, () =>
+    notify(t('Modelo "{name}" apagado', { name: template.name }), () =>
       store.saveSettings({ ...$state.snapshot(store.settings), templates: before }),
     );
   }
 
-  function summary(t: Template) {
-    if (t.type === 'checklist') return `${t.items.length} ${t.items.length === 1 ? 'item' : 'itens'}`;
-    return t.content.slice(0, 60) || 'Texto';
+  function summary(tpl: Template) {
+    if (tpl.type === 'checklist') return tn(tpl.items.length, '{n} item', '{n} itens');
+    return tpl.content.slice(0, 60) || t('Texto');
   }
 </script>
 
-<Sheet title="Modelos" {onclose}>
+<Sheet title={t('Modelos')} {onclose}>
   <p class="help">
-    Para criar um modelo, abre uma nota e escolhe <strong>Mais opções → Guardar como modelo</strong>. As notas criadas a
-    partir de um modelo começam com os itens por marcar.
+    {t('Para criar um modelo, abre uma nota e escolhe Mais opções → Guardar como modelo. As notas criadas a partir de um modelo começam com os itens por marcar.')}
   </p>
   {#if !store.settings.templates.length}
-    <p class="help">Ainda não tens modelos.</p>
+    <p class="help">{t('Ainda não tens modelos.')}</p>
   {:else}
     <ul>
-      {#each store.settings.templates as t (t.id)}
+      {#each store.settings.templates as tpl (tpl.id)}
         <li>
-          <span class="dot" style:--dot="var(--dot-{t.color})" aria-hidden="true"></span>
+          <span class="dot" style:--dot="var(--dot-{tpl.color})" aria-hidden="true"></span>
           <div class="name">
-            <strong>{t.name}</strong>
-            <small>{summary(t)}</small>
+            <strong>{tpl.name}</strong>
+            <small>{summary(tpl)}</small>
           </div>
-          <button class="icon-btn" title="Apagar modelo" aria-label="Apagar modelo {t.name}" onclick={() => remove(t)}>
+          <button
+            class="icon-btn"
+            title={t('Apagar modelo')}
+            aria-label={t('Apagar modelo {name}', { name: tpl.name })}
+            onclick={() => remove(tpl)}>
             <Icon name="trash" size={20} />
           </button>
         </li>

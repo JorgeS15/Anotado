@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import type { Note } from './types';
 
 /** The note as Markdown: title as a heading, checklist items as task list items. */
@@ -39,7 +40,7 @@ export function printNote(note: Note) {
     note.type === 'checklist'
       ? `<ul>${note.items.map((i) => `<li class="${i.done ? 'done' : ''}${i.indent ? ' sub' : ''}">${i.done ? '☑' : '☐'} ${escape(i.text)}</li>`).join('')}</ul>`
       : `<div class="text">${escape(note.content)}</div>`;
-  const html = `<!doctype html><html lang="pt-PT"><head><meta charset="utf-8"><title>${escape(note.title || 'Nota')}</title>
+  const html = `<!doctype html><html lang="${document.documentElement.lang}"><head><meta charset="utf-8"><title>${escape(note.title || t('Nota'))}</title>
 <style>
   body { font: 12pt/1.5 system-ui, sans-serif; color: #000; margin: 2cm; }
   h1 { font-size: 18pt; margin: 0 0 12pt; }

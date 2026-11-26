@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { locale, t, tn } from './lib/i18n';
   import { onMount } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
   import AppMenu from './components/AppMenu.svelte';
@@ -32,13 +33,18 @@
   import { formatDay, normalize, readPref, searchText, uid, writePref } from './lib/util';
 
   const SORTS: { value: SortMode; label: string }[] = [
-    { value: 'updated', label: 'Data de alteração' },
-    { value: 'created', label: 'Data de criação' },
-    { value: 'color', label: 'Cor' },
-    { value: 'title', label: 'Título' },
-    { value: 'manual', label: 'Manual (arrastar)' },
+    { value: 'updated', label: t('Data de alteração') },
+    { value: 'created', label: t('Data de criação') },
+    { value: 'color', label: t('Cor') },
+    { value: 'title', label: t('Título') },
+    { value: 'manual', label: t('Manual (arrastar)') },
   ];
-  const VIEW_TITLES: Record<View, string> = { notes: 'Anotado', reminders: 'Lembretes', archive: 'Arquivo', trash: 'Lixo' };
+  const VIEW_TITLES: Record<View, string> = {
+    notes: 'Anotado',
+    reminders: t('Lembretes'),
+    archive: t('Arquivo'),
+    trash: t('Lixo'),
+  };
 
   let view = $state<View>('notes');
   let query = $state('');
@@ -89,8 +95,8 @@
     store.onreminder = (id) => {
       const note = store.notes[id];
       if (!note) return;
-      const title = note.title.trim() || note.content.trim().split('\n')[0] || 'nota';
-      notify(`Lembrete: ${title.slice(0, 60)}`, undefined, { label: 'Abrir', run: () => openNote(id) });
+      const title = note.title.trim() || note.content.trim().split('\n')[0] || t('nota');
+      notify(t('Lembrete: {title}', { title: title.slice(0, 60) }), undefined, { label: t('Abrir'), run: () => openNote(id) });
     };
     store.init();
   });
@@ -142,7 +148,7 @@
       updated: (a, b) => b.updated_at - a.updated_at,
       created: (a, b) => b.created_at - a.created_at,
       color: (a, b) => COLORS.indexOf(a.color) - COLORS.indexOf(b.color) || b.updated_at - a.updated_at,
-      title: (a, b) => label(a).localeCompare(label(b), 'pt', { sensitivity: 'base' }),
+      title: (a, b) => label(a).localeCompare(label(b), locale, { sensitivity: 'base' }),
       manual: (a, b) => (rank.get(a.id) ?? -1) - (rank.get(b.id) ?? -1) || b.updated_at - a.updated_at,
     };
     if (view === 'trash') return list.sort((a, b) => (b.deleted_at ?? 0) - (a.deleted_at ?? 0));
@@ -220,7 +226,7 @@
       groups.at(-1)!.notes.push(note);
     }
     const past = visible.filter((n) => n.reminder_at! < nowTs).reverse();
-    if (past.length) groups.push({ label: 'Passados', notes: past });
+    if (past.length) groups.push({ label: t('Passados'), notes: past });
     return groups;
   });
 
@@ -329,7 +335,7 @@
   let rejectedSeen = 0;
   $effect(() => {
     // Say it once when a note starts being refused; the editor and the card explain why.
-    if (rejectedCount > rejectedSeen) notify('Uma nota não foi sincronizada: abre-a para ver porquê.');
+    if (rejectedCount > rejectedSeen) notify(t('Uma nota não foi sincronizada: abre-a para ver porquê.'));
     rejectedSeen = rejectedCount;
   });
 
@@ -404,9 +410,9 @@
 
   function emptyTrash() {
     const ids = all.filter((n) => n.deleted_at != null).map((n) => n.id);
-    if (!ids.length || !confirm(`Apagar ${ids.length} ${ids.length === 1 ? 'nota' : 'notas'} para sempre?`)) return;
+    if (!ids.length || !confirm(tn(ids.length, 'Apagar {n} nota para sempre?', 'Apagar {n} notas para sempre?'))) return;
     for (const id of ids) store.purge(id);
-    notify('Lixo esvaziado');
+    notify(t('Lixo esvaziado'));
   }
 
   function exportBackup() {
@@ -427,14 +433,14 @@
   }
 
   async function logoutOthers() {
-    const question =
-      'Terminar a sessão em todos os outros dispositivos? Vão pedir a password outra vez. ' +
-      'As alterações que ainda não sincronizaram ficam guardadas neles e são enviadas depois de entrar.';
+    const question = t(
+      'Terminar a sessão em todos os outros dispositivos? Vão pedir a password outra vez. As alterações que ainda não sincronizaram ficam guardadas neles e são enviadas depois de entrar.',
+    );
     if (confirm(question)) notify(await store.logoutOthers());
   }
 
   function logout() {
-    if (store.pending && !confirm('Há alterações por sincronizar que se vão perder. Terminar sessão mesmo assim?'))
+    if (store.pending && !confirm(t('Há alterações por sincronizar que se vão perder. Terminar sessão mesmo assim?')))
       return;
     store.logout();
   }
@@ -455,27 +461,27 @@
       <img class="logo" src="/favicon.svg" alt="" width="30" height="30" />
       <h1 class="brand">Anotado</h1>
     {:else}
-      <button class="icon-btn" onclick={() => goTo('notes')} aria-label="Voltar às notas"><Icon name="back" /></button>
+      <button class="icon-btn" onclick={() => goTo('notes')} aria-label={t('Voltar às notas')}><Icon name="back" /></button>
       <h1>{VIEW_TITLES[view]}</h1>
     {/if}
 
     <label class="search">
       <Icon name="search" size={18} />
-      <span class="sr-only">Pesquisar</span>
-      <input type="search" placeholder="Pesquisar" bind:value={query} bind:this={searchEl} />
+      <span class="sr-only">{t('Pesquisar')}</span>
+      <input type="search" placeholder={t('Pesquisar')} bind:value={query} bind:this={searchEl} />
     </label>
 
     {#if !store.online}
-      <span class="status" title="Sem ligação. As alterações são enviadas quando a ligação voltar.">
+      <span class="status" title={t('Sem ligação. As alterações são enviadas quando a ligação voltar.')}>
         <Icon name="cloudOff" size={20} />
         {#if store.pending}<small>{store.pending}</small>{/if}
       </span>
     {:else if rejectedCount}
-      <span class="status warn" title="{rejectedCount} {rejectedCount === 1 ? 'nota não sincronizada' : 'notas não sincronizadas'}: abre-as para ver porquê.">
+      <span class="status warn" title={tn(rejectedCount, '{n} nota não sincronizada: abre-a para ver porquê.', '{n} notas não sincronizadas: abre-as para ver porquê.')}>
         <Icon name="warning" size={20} /><small>{rejectedCount}</small>
       </span>
     {:else if store.pending}
-      <span class="status syncing" title="A sincronizar…"><Icon name="sync" size={18} /></span>
+      <span class="status syncing" title={t('A sincronizar…')}><Icon name="sync" size={18} /></span>
     {/if}
 
     <AppMenu
@@ -500,20 +506,20 @@
   {#if pwa.needRefresh}
     <div class="update-bar" role="status">
       <Icon name="update" size={18} />
-      <span>Há uma nova versão do Anotado.</span>
-      <button onclick={() => pwa.update()}>Atualizar</button>
+      <span>{t('Há uma nova versão do Anotado.')}</span>
+      <button onclick={() => pwa.update()}>{t('Atualizar')}</button>
     </div>
   {/if}
 
   <div class="toolbar">
-    <div class="filters" role="group" aria-label="Filtrar por cor">
+    <div class="filters" role="group" aria-label={t('Filtrar por cor')}>
       {#each COLORS as color (color)}
         <button
           class="dot"
           class:selected={colorFilter === color}
           style:--dot="var(--dot-{color})"
           title={colorLabel(color)}
-          aria-label="Filtrar: {colorLabel(color)}"
+          aria-label={t('Filtrar: {color}', { color: colorLabel(color) })}
           aria-pressed={colorFilter === color}
           onclick={() => (colorFilter = colorFilter === color ? null : color)}></button>
       {/each}
@@ -524,10 +530,10 @@
     {#if view !== 'trash' && view !== 'reminders'}
       <Popover bind:open={sortOpen}>
         {#snippet trigger(toggle)}
-          <button class="icon-btn" onclick={toggle} title="Ordenar"><Icon name="sort" size={20} /></button>
+          <button class="icon-btn" onclick={toggle} title={t('Ordenar')}><Icon name="sort" size={20} /></button>
         {/snippet}
         {#snippet children(close)}
-          <div class="label">Ordenar por</div>
+          <div class="label">{t('Ordenar por')}</div>
           {#each SORTS as s (s.value)}
             <button class="item" class:selected={sort === s.value} onclick={() => ((sort = s.value), close())}>
               {s.label}
@@ -539,7 +545,7 @@
     <button
       class="icon-btn"
       onclick={() => (layout = layout === 'grid' ? 'list' : 'grid')}
-      title={layout === 'grid' ? 'Ver em lista' : 'Ver em grelha'}>
+      title={layout === 'grid' ? t('Ver em lista') : t('Ver em grelha')}>
       <Icon name={layout === 'grid' ? 'list' : 'grid'} size={20} />
     </button>
   </div>
@@ -563,23 +569,23 @@
   <main>
     {#if view === 'trash' && counts.trash}
       <div class="trash-bar">
-        <span>As notas no lixo são apagadas ao fim de {store.trashDays} {store.trashDays === 1 ? 'dia' : 'dias'}.</span>
-        <button class="btn ghost" onclick={emptyTrash}>Esvaziar lixo</button>
+        <span>{tn(store.trashDays, 'As notas no lixo são apagadas ao fim de {n} dia.', 'As notas no lixo são apagadas ao fim de {n} dias.')}</span>
+        <button class="btn ghost" onclick={emptyTrash}>{t('Esvaziar lixo')}</button>
       </div>
     {/if}
 
     {#if !visible.length}
       <p class="empty">
         {#if query || colorFilter}
-          Sem resultados.
+          {t('Sem resultados.')}
         {:else if view === 'archive'}
-          Nada arquivado.
+          {t('Nada arquivado.')}
         {:else if view === 'reminders'}
-          Sem lembretes.<br />Abre uma nota e toca no sino para criar um.
+          {t('Sem lembretes.')}<br />{t('Abre uma nota e toca no sino para criar um.')}
         {:else if view === 'trash'}
-          O lixo está vazio.
+          {t('O lixo está vazio.')}
         {:else}
-          Ainda não tens notas.<br />Toca em <strong>+</strong> para criar a primeira.
+          {t('Ainda não tens notas.')}<br />{t('Toca em + para criar a primeira.')}
         {/if}
       </p>
     {/if}
@@ -594,13 +600,13 @@
         </div>
       {/each}
     {:else if pinned.length}
-      <h2>Fixadas</h2>
+      <h2>{t('Fixadas')}</h2>
       <div class="notes {layout}">
         {#each pinned as note (note.id)}
           {@render noteCard(note)}
         {/each}
       </div>
-      {#if others.length}<h2>Outras</h2>{/if}
+      {#if others.length}<h2>{t('Outras')}</h2>{/if}
     {/if}
     {#if view !== 'reminders'}
     <div class="notes {layout}">
@@ -615,26 +621,26 @@
     <div class="fab">
       <Popover bind:open={fabOpen} up>
         {#snippet trigger(toggle)}
-          <button class="fab-btn" class:open={fabOpen} onclick={toggle} aria-label="Nova nota">
+          <button class="fab-btn" class:open={fabOpen} onclick={toggle} aria-label={t('Nova nota')}>
             <Icon name="plus" size={28} />
           </button>
         {/snippet}
         {#snippet children(close)}
-          <button class="item" onclick={() => (close(), newNote('text'))}><Icon name="text" /> Texto</button>
+          <button class="item" onclick={() => (close(), newNote('text'))}><Icon name="text" /> {t('Texto')}</button>
           <button class="item" onclick={() => (close(), newNote('checklist'))}>
-            <Icon name="checklist" /> Checklist
+            <Icon name="checklist" /> {t('Checklist')}
           </button>
           {#if store.settings.templates.length}
             <hr />
-            <div class="label">Modelos</div>
-            {#each store.settings.templates as t (t.id)}
-              <button class="item" onclick={() => (close(), newNote(t.type, t.title, t.content, t))}>
-                <Icon name={t.type === 'checklist' ? 'checklist' : 'text'} />
-                <span class="template-name">{t.name}</span>
+            <div class="label">{t('Modelos')}</div>
+            {#each store.settings.templates as tpl (tpl.id)}
+              <button class="item" onclick={() => (close(), newNote(tpl.type, tpl.title, tpl.content, tpl))}>
+                <Icon name={tpl.type === 'checklist' ? 'checklist' : 'text'} />
+                <span class="template-name">{tpl.name}</span>
               </button>
             {/each}
             <button class="item manage" onclick={() => (close(), (sheet = 'templates'))}>
-              <Icon name="template" /> Gerir modelos
+              <Icon name="template" /> {t('Gerir modelos')}
             </button>
           {/if}
         {/snippet}
@@ -682,7 +688,7 @@
             onclick={() => {
               toast?.undo?.();
               toast = null;
-            }}>Anular</button>
+            }}>{t('Anular')}</button>
         {/if}
       </div>
     {/key}

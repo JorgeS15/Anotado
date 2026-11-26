@@ -3,7 +3,8 @@
 *[Português](README.md)*
 
 Simple, colourful notes in the style of ColorNote, for your computer and your phone (PWA).
-Self-hosted with Docker, single user, works offline. The interface is in Portuguese (pt-PT) for now.
+Self-hosted with Docker, single user, works offline. The interface is in English and Portuguese
+(it follows the browser's language; change it in the menu).
 
 <p align="center">
   <img src="docs/screenshot-desktop.png" alt="Anotado on a computer: colourful notes in a grid, with checklists and text notes" width="640">

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../lib/i18n';
   import { highlight } from '../lib/highlight';
   import type { Note } from '../lib/types';
   import { formatReminder, formatShort, normalize } from '../lib/util';
@@ -125,7 +126,7 @@
   {#if reorderable && !selecting}
     <span
       class="grip"
-      title="Arrastar para mudar a ordem"
+      title={t('Arrastar para mudar a ordem')}
       aria-hidden="true"
       onpointerdown={(e) => {
         e.stopPropagation();
@@ -141,7 +142,7 @@
   {#if note.title || note.pinned}
     <div class="head">
       {#if note.title}<h3>{@render marked(note.title)}</h3>{/if}
-      {#if note.pinned && !selecting}<span class="pin" title="Fixada"><Icon name="pin" size={16} /></span>{/if}
+      {#if note.pinned && !selecting}<span class="pin" title={t('Fixada')}><Icon name="pin" size={16} /></span>{/if}
     </div>
   {/if}
 
@@ -156,7 +157,7 @@
     </ul>
     {#if note.items.length > shown.length || doneCount}
       <p class="meta">
-        {#if note.items.length > shown.length}+{note.items.length - shown.length} itens · {/if}{doneCount}/{note.items.length}
+        {#if note.items.length > shown.length}{t('+{n} itens', { n: note.items.length - shown.length })} · {/if}{doneCount}/{note.items.length}
       </p>
     {/if}
   {:else if note.content}
@@ -164,17 +165,17 @@
   {/if}
 
   {#if !note.title && !note.content && !note.items.length}
-    <p class="text empty">Nota vazia</p>
+    <p class="text empty">{t('Nota vazia')}</p>
   {/if}
 
   <span class="date">
     {#if note.reminder_at != null && note.deleted_at == null}
-      <span class="reminder" class:past={note.reminder_at < Date.now()} title="Lembrete">
+      <span class="reminder" class:past={note.reminder_at < Date.now()} title={t('Lembrete')}>
         <Icon name="bell" size={14} />
         {formatReminder(note.reminder_at)}
       </span>
     {/if}
-    {#if warning}<span class="warn" title={warning}><Icon name="warning" size={14} /> Não sincronizada</span>{/if}
+    {#if warning}<span class="warn" title={warning}><Icon name="warning" size={14} /> {t('Não sincronizada')}</span>{/if}
     {formatShort(note.updated_at)}
   </span>
 </button>

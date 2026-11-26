@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { langPref, setLangPref, t, type LangPref } from '../lib/i18n';
   import { pwa } from '../lib/pwa.svelte';
   import { store } from '../lib/store.svelte';
   import type { FontSize, Theme, View } from '../lib/types';
@@ -6,15 +7,21 @@
   import Popover from './Popover.svelte';
 
   const THEMES: { value: Theme; label: string }[] = [
-    { value: 'auto', label: 'Automático' },
-    { value: 'light', label: 'Claro' },
-    { value: 'dark', label: 'Escuro' },
+    { value: 'auto', label: t('Automático') },
+    { value: 'light', label: t('Claro') },
+    { value: 'dark', label: t('Escuro') },
   ];
   const FONT_SIZES: { value: FontSize; label: string }[] = [
-    { value: 'small', label: 'Pequena' },
-    { value: 'normal', label: 'Normal' },
-    { value: 'large', label: 'Grande' },
+    { value: 'small', label: t('Pequena') },
+    { value: 'normal', label: t('Normal') },
+    { value: 'large', label: t('Grande') },
   ];
+  const LANGS: { value: LangPref; label: string }[] = [
+    { value: 'auto', label: t('Automático') },
+    { value: 'pt', label: 'Português' },
+    { value: 'en', label: 'English' },
+  ];
+  const currentLang = langPref();
 
   let {
     view,
@@ -60,50 +67,56 @@
   {/snippet}
   {#snippet children(close)}
     <button class="item" class:selected={view === 'notes'} onclick={() => (close(), ongo('notes'))}>
-      <Icon name="notes" /> Notas
+      <Icon name="notes" /> {t('Notas')}
     </button>
     <button class="item" class:selected={view === 'reminders'} onclick={() => (close(), ongo('reminders'))}>
-      <Icon name="bell" /> Lembretes {#if counts.reminders}<span class="count">{counts.reminders}</span>{/if}
+      <Icon name="bell" /> {t('Lembretes')} {#if counts.reminders}<span class="count">{counts.reminders}</span>{/if}
     </button>
     <button class="item" class:selected={view === 'archive'} onclick={() => (close(), ongo('archive'))}>
-      <Icon name="archive" /> Arquivo {#if counts.archive}<span class="count">{counts.archive}</span>{/if}
+      <Icon name="archive" /> {t('Arquivo')} {#if counts.archive}<span class="count">{counts.archive}</span>{/if}
     </button>
     <button class="item" class:selected={view === 'trash'} onclick={() => (close(), ongo('trash'))}>
-      <Icon name="trash" /> Lixo {#if counts.trash}<span class="count">{counts.trash}</span>{/if}
+      <Icon name="trash" /> {t('Lixo')} {#if counts.trash}<span class="count">{counts.trash}</span>{/if}
     </button>
     <hr />
-    <div class="label">Tema</div>
-    <div class="segmented" role="radiogroup" aria-label="Tema">
-      {#each THEMES as t (t.value)}
-        <button role="radio" aria-checked={theme === t.value} onclick={() => (theme = t.value)}>{t.label}</button>
+    <div class="label">{t('Tema')}</div>
+    <div class="segmented" role="radiogroup" aria-label={t('Tema')}>
+      {#each THEMES as th (th.value)}
+        <button role="radio" aria-checked={theme === th.value} onclick={() => (theme = th.value)}>{th.label}</button>
       {/each}
     </div>
-    <div class="label">Tamanho da letra</div>
-    <div class="segmented" role="radiogroup" aria-label="Tamanho da letra">
+    <div class="label">{t('Tamanho da letra')}</div>
+    <div class="segmented" role="radiogroup" aria-label={t('Tamanho da letra')}>
       {#each FONT_SIZES as f (f.value)}
         <button role="radio" aria-checked={fontSize === f.value} onclick={() => (fontSize = f.value)}>{f.label}</button>
       {/each}
     </div>
+    <div class="label">{t('Língua')}</div>
+    <div class="segmented" role="radiogroup" aria-label={t('Língua')}>
+      {#each LANGS as l (l.value)}
+        <button role="radio" aria-checked={currentLang === l.value} onclick={() => setLangPref(l.value)}>{l.label}</button>
+      {/each}
+    </div>
     <hr />
-    <button class="item" onclick={() => (close(), onselect())}><Icon name="select" /> Selecionar notas</button>
-    <button class="item" onclick={() => (close(), oncolornames())}><Icon name="palette" /> Nomes das cores</button>
+    <button class="item" onclick={() => (close(), onselect())}><Icon name="select" /> {t('Selecionar notas')}</button>
+    <button class="item" onclick={() => (close(), oncolornames())}><Icon name="palette" /> {t('Nomes das cores')}</button>
     {#if pwa.canInstall}
-      <button class="item" onclick={() => (close(), pwa.install())}><Icon name="download" /> Instalar app</button>
+      <button class="item" onclick={() => (close(), pwa.install())}><Icon name="download" /> {t('Instalar app')}</button>
     {/if}
     <hr />
-    <button class="item" onclick={() => (close(), onexport())}><Icon name="download" /> Exportar backup</button>
-    <button class="item" onclick={() => (close(), onimport())}><Icon name="upload" /> Importar backup</button>
-    <button class="item" onclick={() => (close(), oncolornote())}><Icon name="colornote" /> Importar do ColorNote</button>
-    <button class="item" onclick={() => (close(), onserver())}><Icon name="server" /> Servidor e backups</button>
+    <button class="item" onclick={() => (close(), onexport())}><Icon name="download" /> {t('Exportar backup')}</button>
+    <button class="item" onclick={() => (close(), onimport())}><Icon name="upload" /> {t('Importar backup')}</button>
+    <button class="item" onclick={() => (close(), oncolornote())}><Icon name="colornote" /> {t('Importar do ColorNote')}</button>
+    <button class="item" onclick={() => (close(), onserver())}><Icon name="server" /> {t('Servidor e backups')}</button>
     <hr />
-    <button class="item" onclick={() => (close(), onshortcuts())}><Icon name="keyboard" /> Atalhos de teclado</button>
-    <button class="item" onclick={() => (close(), onlogout())}><Icon name="logout" /> Terminar sessão</button>
+    <button class="item" onclick={() => (close(), onshortcuts())}><Icon name="keyboard" /> {t('Atalhos de teclado')}</button>
+    <button class="item" onclick={() => (close(), onlogout())}><Icon name="logout" /> {t('Terminar sessão')}</button>
     <button class="item" onclick={() => (close(), onlogoutothers())}>
-      <Icon name="logout" /> Terminar sessão nos outros dispositivos
+      <Icon name="logout" /> {t('Terminar sessão nos outros dispositivos')}
     </button>
     {#if store.newVersion}
       <a class="item new-version" href={store.newVersion.url} target="_blank" rel="noopener noreferrer">
-        <Icon name="update" /> Nova versão: v{store.newVersion.version}
+        <Icon name="update" /> {t('Nova versão: v{version}', { version: store.newVersion.version })}
       </a>
     {/if}
     <div class="version">Anotado v{__APP_VERSION__}</div>

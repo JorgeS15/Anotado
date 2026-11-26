@@ -11,7 +11,7 @@ O Anotado quer continuar a ser **simples**: uma ideia só entra se não complica
 
 ## Feito na 1.2.0
 
-Lembretes com notificação, nomes para as cores, ordem manual das notas, sub-itens, "Desmarcar tudo", "Apagar concluídos" e concluídos recolhíveis nas checklists, modelos de notas, ecrã
+Lembretes com notificação, interface em inglês, nomes para as cores, ordem manual das notas, sub-itens, "Desmarcar tudo", "Apagar concluídos" e concluídos recolhíveis nas checklists, modelos de notas, ecrã
 "Servidor e backups" com restauro, cópia dos backups para WebDAV, terminar sessão nos outros dispositivos, `TRASH_DAYS`, `TRUST_PROXY`, barra do sistema com a cor da nota,
 atalhos novos com ajuda (`?`), tamanho da letra, exportar e imprimir uma nota, aviso de versão nova,
 token de API para automações com guia para o Home Assistant, README em inglês com capturas de ecrã,
@@ -42,7 +42,7 @@ CI de volta ao `ubuntu-latest` e o `App.svelte` dividido em componentes. Detalhe
 | # | O quê | Porquê | Esforço |
 |---|---|---|---|
 | 6 | **Vista de calendário em grelha (mês)** | A vista Lembretes já agrupa por dia; uma grelha do mês ajudaria a ver a semana ou o mês de relance. | M |
-| 7 | **Interface em inglês** (e outras línguas) | A interface só existe em português. Num projeto público, a língua seguiria a do browser. | M |
+| 7 | **Mais línguas** | A interface já existe em português e inglês; outra língua é só um dicionário novo (`web/src/lib/i18n-en.ts` serve de modelo). | P |
 | 8 | **Mudar a password a partir da app** | Hoje só se muda na variável de ambiente. Terminar a sessão nos outros dispositivos já é possível no menu. | M |
 | 9 | **Bloquear notas com PIN** | Esconde notas sensíveis de quem pega no telemóvel. É só um bloqueio visual, não encripta os dados. | M |
 | 10 | **Imagens nas notas** | Fotos de recibos, quadros ou receitas. Exige guardar ficheiros, sincronizá-los e incluí-los nos backups. | G |

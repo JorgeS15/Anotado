@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../lib/i18n';
   import { onMount } from 'svelte';
   import { store } from '../lib/store.svelte';
   import type { Note, NoteVersion } from '../lib/types';
@@ -22,7 +23,7 @@
     try {
       versions = await store.noteVersions(id);
     } catch {
-      error = 'O histórico precisa de ligação ao servidor.';
+      error = t('O histórico precisa de ligação ao servidor.');
     }
   });
 
@@ -37,33 +38,33 @@
       await store.restoreVersion(id, version.id);
       onrestored();
     } catch {
-      error = 'Não foi possível restaurar (sem ligação?).';
+      error = t('Não foi possível restaurar (sem ligação?).');
     }
     busy = false;
   }
 </script>
 
-<Sheet title="Histórico" {onclose}>
+<Sheet title={t('Histórico')} {onclose}>
   <div class="list">
     {#if error}
       <p class="info">{error}</p>
     {:else if versions === null}
-      <p class="info">A carregar…</p>
+      <p class="info">{t('A carregar…')}</p>
     {:else if !versions.length}
-      <p class="info">Ainda não há versões anteriores desta nota. São guardadas automaticamente enquanto a editas.</p>
+      <p class="info">{t('Ainda não há versões anteriores desta nota. São guardadas automaticamente enquanto a editas.')}</p>
     {:else}
       {#each versions as version (version.id)}
         <div class="version" class:open={open === version.id}>
           <button class="row" onclick={() => (open = open === version.id ? null : version.id)}>
             <strong>{formatFull(version.saved_at)}</strong>
-            <span class="preview">{version.note.title || body(version.note).slice(0, 80) || 'Nota vazia'}</span>
+            <span class="preview">{version.note.title || body(version.note).slice(0, 80) || t('Nota vazia')}</span>
           </button>
           {#if open === version.id}
             <div class="detail">
               {#if version.note.title}<h3>{version.note.title}</h3>{/if}
               <pre>{body(version.note)}</pre>
               <button class="btn" disabled={busy} onclick={() => restore(version)}>
-                <Icon name="restore" size={18} /> Restaurar esta versão
+                <Icon name="restore" size={18} /> {t('Restaurar esta versão')}
               </button>
             </div>
           {/if}

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../lib/i18n';
   import { onMount, type Snippet } from 'svelte';
   import { trapFocus } from '../lib/focus';
   import Icon from './Icon.svelte';
@@ -18,7 +19,7 @@
   <div class="sheet" role="dialog" aria-modal="true" aria-label={title} bind:this={sheet}>
     <header>
       <h2>{title}</h2>
-      <button class="icon-btn" onclick={onclose} aria-label="Fechar"><Icon name="close" /></button>
+      <button class="icon-btn" onclick={onclose} aria-label={t('Fechar')}><Icon name="close" /></button>
     </header>
     <div class="content">
       {@render children()}

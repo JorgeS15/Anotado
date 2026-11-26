@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../lib/i18n';
   import { store } from '../lib/store.svelte';
   import { COLORS, COLOR_LABELS, type Color } from '../lib/types';
   import Sheet from './Sheet.svelte';
@@ -15,31 +16,30 @@
     const color_names: Partial<Record<Color, string>> = {};
     for (const c of COLORS) if (names[c].trim()) color_names[c] = names[c].trim();
     store.saveSettings({ ...$state.snapshot(store.settings), color_names });
-    notify('Nomes das cores guardados');
+    notify(t('Nomes das cores guardados'));
     onclose();
   }
 </script>
 
-<Sheet title="Nomes das cores" {onclose}>
+<Sheet title={t('Nomes das cores')} {onclose}>
   <form onsubmit={save}>
     <p class="help">
-      Dá um nome às cores que usas como categorias (por exemplo, verde = "Compras"). Aparece no filtro e ao escolher a
-      cor, em todos os dispositivos.
+      {t('Dá um nome às cores que usas como categorias (por exemplo, verde = "Compras"). Aparece no filtro e ao escolher a cor, em todos os dispositivos.')}
     </p>
     <ul>
       {#each COLORS as color (color)}
         <li>
           <span class="dot" style:--dot="var(--dot-{color})" aria-hidden="true"></span>
           <label>
-            <span class="sr-only">Nome para {COLOR_LABELS[color]}</span>
+            <span class="sr-only">{t('Nome para {color}', { color: COLOR_LABELS[color] })}</span>
             <input type="text" maxlength="40" placeholder={COLOR_LABELS[color]} bind:value={names[color]} />
           </label>
         </li>
       {/each}
     </ul>
     <div class="actions">
-      <button class="btn ghost" type="button" onclick={onclose}>Cancelar</button>
-      <button class="btn" type="submit">Guardar</button>
+      <button class="btn ghost" type="button" onclick={onclose}>{t('Cancelar')}</button>
+      <button class="btn" type="submit">{t('Guardar')}</button>
     </div>
   </form>
 </Sheet>

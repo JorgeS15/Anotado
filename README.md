@@ -27,7 +27,7 @@ Notas simples e coloridas, ao estilo do ColorNote, para usar no PC e no telemóv
 - **Importar do ColorNote** (backup `.doc`/`.dat`)
 - Seleção múltipla (toque longo ou **Menu → Selecionar notas**) para mudar cor, fixar, arquivar ou apagar várias notas de uma vez
 - Partilhar e duplicar notas; partilhar de outras apps **para** o Anotado (Android)
-- Modo claro e escuro
+- Modo claro e escuro; interface em português e inglês (segue a língua do browser, ou escolhe no menu)
 - **Automações**: com um token de API, o Home Assistant, os Atalhos do iPhone ou o Tasker podem
   criar notas e acrescentar itens a uma lista ([guia](docs/automacoes.md))
 - Avisa quando há uma versão nova

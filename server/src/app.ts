@@ -272,9 +272,10 @@ export function createApp({
 
   app.post('/api/push/test', async (c) => {
     if (!push) return c.json({ error: 'push is not configured' }, 400);
+    const pt = /^pt\b/i.test(c.req.header('accept-language') ?? 'pt');
     const sent = await notifyAll(store, push, {
       title: 'Anotado',
-      body: 'As notificações estão a funcionar.',
+      body: pt ? 'As notificações estão a funcionar.' : 'Notifications are working.',
       id: '',
     });
     return c.json({ sent });

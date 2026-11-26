@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../lib/i18n';
   import { enablePush, pushState } from '../lib/push';
   import { formatReminder } from '../lib/util';
   import Icon from './Icon.svelte';
@@ -27,11 +28,11 @@
   const quick = $derived.by(() => {
     void open;
     const now = new Date();
-    const options: { label: string; at: number }[] = [{ label: 'Daqui a 1 hora', at: Date.now() + 60 * 60 * 1000 }];
-    if (now.getHours() < 17) options.push({ label: 'Hoje às 18:00', at: at(0, 18) });
-    options.push({ label: 'Amanhã às 9:00', at: at(1, 9) });
+    const options: { label: string; at: number }[] = [{ label: t('Daqui a 1 hora'), at: Date.now() + 60 * 60 * 1000 }];
+    if (now.getHours() < 17) options.push({ label: t('Hoje às 18:00'), at: at(0, 18) });
+    options.push({ label: t('Amanhã às 9:00'), at: at(1, 9) });
     const toMonday = ((8 - now.getDay()) % 7) || 7;
-    options.push({ label: 'Segunda-feira às 9:00', at: at(toMonday, 9) });
+    options.push({ label: t('Segunda-feira às 9:00'), at: at(toMonday, 9) });
     return options;
   });
 
@@ -48,17 +49,16 @@
     close();
     onchange(ts);
     if (ts === null) {
-      notify('Lembrete removido');
+      notify(t('Lembrete removido'));
       return;
     }
     // Ask for notifications the first time a reminder is set on this device.
     let state = await pushState();
     if (state === 'off') state = await enablePush().catch(() => 'off' as const);
     const when = formatReminder(ts);
-    if (state === 'on') notify(`Lembrete para ${when}`);
-    else if (state === 'denied')
-      notify(`Lembrete para ${when}, mas as notificações estão bloqueadas neste dispositivo.`);
-    else notify(`Lembrete para ${when}. Ativa as notificações em Menu → Servidor e backups.`);
+    if (state === 'on') notify(t('Lembrete para {when}', { when }));
+    else if (state === 'denied') notify(t('Lembrete para {when}, mas as notificações estão bloqueadas neste dispositivo.', { when }));
+    else notify(t('Lembrete para {when}. Ativa as notificações em Menu → Servidor e backups.', { when }));
   }
 
   function submit(e: SubmitEvent, close: () => void) {
@@ -70,15 +70,15 @@
 
 <Popover bind:open>
   {#snippet trigger(toggle)}
-    <button class="icon-btn" class:active={value != null} onclick={toggle} title="Lembrete">
+    <button class="icon-btn" class:active={value != null} onclick={toggle} title={t('Lembrete')}>
       <Icon name="bell" />
     </button>
   {/snippet}
   {#snippet children(close)}
     {#if value != null}
-      <div class="label">Lembrete</div>
+      <div class="label">{t('Lembrete')}</div>
       <div class="current">{formatReminder(value)}</div>
-      <button class="item danger" onclick={() => set(null, close)}><Icon name="bellOff" /> Remover lembrete</button>
+      <button class="item danger" onclick={() => set(null, close)}><Icon name="bellOff" /> {t('Remover lembrete')}</button>
       <hr />
     {/if}
     {#each quick as q (q.label)}
@@ -87,10 +87,10 @@
     <hr />
     <form class="custom" onsubmit={(e) => submit(e, close)}>
       <label>
-        <span class="sr-only">Data e hora do lembrete</span>
+        <span class="sr-only">{t('Data e hora do lembrete')}</span>
         <input type="datetime-local" bind:value={custom} required />
       </label>
-      <button class="btn" type="submit">Definir</button>
+      <button class="btn" type="submit">{t('Definir')}</button>
     </form>
   {/snippet}
 </Popover>

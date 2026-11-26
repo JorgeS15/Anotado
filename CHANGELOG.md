@@ -22,6 +22,7 @@ e as versões seguem [Semantic Versioning](https://semver.org/lang/pt-PT/).
 - **Backups fora do servidor**: `BACKUP_WEBDAV_URL` (com `BACKUP_WEBDAV_USER` e `BACKUP_WEBDAV_PASSWORD`) copia cada backup diário para uma pasta WebDAV, como o Nextcloud ou um NAS, e `BACKUP_DIR` muda a pasta dos backups. O estado da cópia aparece em Servidor e backups.
 - `TRASH_DAYS` define quantos dias as notas ficam no lixo (por omissão 30).
 - `TRUST_PROXY=false` faz o limite de tentativas de login ignorar `X-Forwarded-For`, para quem expõe a porta sem proxy.
+- **Interface em inglês**: a língua segue a do browser e pode ser escolhida no menu (Automático, Português, English). As datas e os números seguem a língua. O `npm run check` falha se algum texto ficar sem tradução.
 - README em inglês, com capturas de ecrã.
 
 ### Changed

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t, tn } from '../lib/i18n';
   import { HttpError, store } from '../lib/store.svelte';
   import { COLORS, COLOR_LABELS, type Color, type ColorNotePreview } from '../lib/types';
   import Icon from './Icon.svelte';
@@ -28,8 +29,8 @@
     } catch (err) {
       error =
         err instanceof HttpError && err.status === 400
-          ? err.message
-          : 'Não foi possível ler o ficheiro (sem ligação ao servidor?).';
+          ? t(err.message)
+          : t('Não foi possível ler o ficheiro (sem ligação ao servidor?).');
     }
     busy = false;
   }
@@ -41,48 +42,50 @@
       notify(await store.importColorNote(preview, colors));
       onclose();
     } catch {
-      error = 'Não foi possível importar (sem ligação ao servidor?).';
+      error = t('Não foi possível importar (sem ligação ao servidor?).');
     }
     busy = false;
   }
 </script>
 
-<Sheet title="Importar do ColorNote" {onclose}>
+<Sheet title={t('Importar do ColorNote')} {onclose}>
 
     <div class="content">
       {#if !preview}
         <form onsubmit={read}>
           <p class="help">
-            No ColorNote, abre <strong>Definições → Backup → Fazer backup</strong> e copia o ficheiro (por exemplo
-            <code>.doc</code> ou <code>.dat</code>) da pasta <code>data/colornote/backup</code> para aqui.
+            {t('No ColorNote, abre Definições → Backup → Fazer backup e copia o ficheiro (por exemplo .doc ou .dat) da pasta data/colornote/backup para aqui.')}
           </p>
           <label>
-            Ficheiro de backup
+            {t('Ficheiro de backup')}
             <input type="file" onchange={(e) => (file = e.currentTarget.files?.[0] ?? null)} />
           </label>
           <label>
-            Password do backup
+            {t('Password do backup')}
             <input type="text" bind:value={password} autocomplete="off" />
-            <small>Por omissão é 0000, a não ser que tenhas definido outra no ColorNote.</small>
+            <small>{t('Por omissão é 0000, a não ser que tenhas definido outra no ColorNote.')}</small>
           </label>
           {#if error}<p class="error" role="alert">{error}</p>{/if}
-          <button class="btn" type="submit" disabled={!file || busy}>{busy ? 'A ler…' : 'Ler backup'}</button>
+          <button class="btn" type="submit" disabled={!file || busy}>{busy ? t('A ler…') : t('Ler backup')}</button>
         </form>
       {:else}
         <p>
-          Encontrei <strong>{preview.records.length}</strong> notas ({checklists} checklists, {archived} arquivadas).
-          Notas já importadas antes são atualizadas, não duplicadas.
+          {t('Encontrei {n} notas ({checklists} checklists, {archived} arquivadas). Notas já importadas antes são atualizadas, não duplicadas.', {
+            n: preview.records.length,
+            checklists,
+            archived,
+          })}
         </p>
-        <h3>Cores</h3>
-        <p class="help">Escolhe a cor do Anotado para cada cor do ColorNote. Os exemplos ajudam a reconhecê-las.</p>
+        <h3>{t('Cores')}</h3>
+        <p class="help">{t('Escolhe a cor do Anotado para cada cor do ColorNote. Os exemplos ajudam a reconhecê-las.')}</p>
         <ul class="colors">
           {#each preview.colors as c (c.index)}
             <li>
               <div class="info">
-                <strong>Cor {c.index}</strong> · {c.count} {c.count === 1 ? 'nota' : 'notas'}
+                <strong>{t('Cor {n}', { n: c.index })}</strong> · {tn(c.count, '{n} nota', '{n} notas')}
                 {#if c.samples.length}<small>{c.samples.join(' · ')}</small>{/if}
               </div>
-              <div class="dots" role="radiogroup" aria-label="Cor para {c.index}">
+              <div class="dots" role="radiogroup" aria-label={t('Cor para {n}', { n: c.index })}>
                 {#each COLORS as color (color)}
                   <button
                     type="button"
@@ -100,9 +103,9 @@
         </ul>
         {#if error}<p class="error" role="alert">{error}</p>{/if}
         <div class="actions">
-          <button class="btn ghost" onclick={() => (preview = null)}>Voltar</button>
+          <button class="btn ghost" onclick={() => (preview = null)}>{t('Voltar')}</button>
           <button class="btn" onclick={importNow} disabled={busy}>
-            {busy ? 'A importar…' : `Importar ${preview.records.length} notas`}
+            {busy ? t('A importar…') : t('Importar {n} notas', { n: preview.records.length })}
           </button>
         </div>
       {/if}
@@ -151,12 +154,6 @@
     background: var(--bg);
   }
 
-  code {
-    font-size: 0.85em;
-    background: var(--surface-2);
-    padding: 1px 4px;
-    border-radius: 4px;
-  }
 
   .error {
     color: var(--danger);

@@ -301,3 +301,25 @@ test('the reminders view lists notes by the day of their reminder', async ({ pag
   await expect(page.locator('main h2', { hasText: 'Amanhã' })).toBeVisible();
   await expect(card(page, 'Dentista')).toContainText('amanhã, 09:00');
 });
+
+test.describe('in English', () => {
+  test.use({ locale: 'en-GB' });
+
+  test('the interface follows the browser language and can be switched in the menu', async ({ page }) => {
+    await page.goto('/');
+    await page.fill('#password', 'errada');
+    await page.click('button[type=submit]');
+    await expect(page.locator('.error')).toHaveText('Wrong password.');
+    await login(page);
+    await expect(page.locator('.search input')).toHaveAttribute('placeholder', 'Search');
+    await page.click('[aria-label="New note"]');
+    await expect(page.locator('.fab .item').first()).toHaveText('Text');
+    await page.keyboard.press('Escape');
+
+    await page.click('[aria-label="Menu"]');
+    await expect(page.locator('.panel')).toContainText('Server and backups');
+    await page.locator('.panel [role=radio]', { hasText: 'Português' }).click();
+    await expect(page.locator('.search input')).toHaveAttribute('placeholder', 'Pesquisar');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'pt-PT');
+  });
+});

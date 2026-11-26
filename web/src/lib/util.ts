@@ -1,3 +1,4 @@
+import { locale, t } from './i18n';
 import type { ChecklistItem, Note } from './types';
 
 export function uid(): string {
@@ -36,9 +37,9 @@ export function findLinks(text: string): string[] {
   return [...new Set(text.match(URL_RE) ?? [])];
 }
 
-const fullDate = new Intl.DateTimeFormat('pt-PT', { dateStyle: 'medium', timeStyle: 'short' });
-const shortDate = new Intl.DateTimeFormat('pt-PT', { day: 'numeric', month: 'short' });
-const timeOnly = new Intl.DateTimeFormat('pt-PT', { timeStyle: 'short' });
+const fullDate = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' });
+const shortDate = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short' });
+const timeOnly = new Intl.DateTimeFormat(locale, { timeStyle: 'short' });
 
 export function formatFull(ts: number): string {
   return fullDate.format(ts);
@@ -49,7 +50,7 @@ export function formatShort(ts: number): string {
   const now = new Date();
   if (d.toDateString() === now.toDateString()) return timeOnly.format(d);
   if (d.getFullYear() === now.getFullYear()) return shortDate.format(d);
-  return d.toLocaleDateString('pt-PT');
+  return d.toLocaleDateString(locale);
 }
 
 export function readPref<T extends string>(key: string, allowed: readonly T[], fallback: T): T {
@@ -92,8 +93,8 @@ export function setHiddenDone(id: string, hidden: boolean): void {
   }
 }
 
-const reminderFormat = new Intl.DateTimeFormat('pt-PT', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-const reminderTime = new Intl.DateTimeFormat('pt-PT', { hour: '2-digit', minute: '2-digit' });
+const reminderFormat = new Intl.DateTimeFormat(locale, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+const reminderTime = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' });
 
 /** "hoje, 18:00", "amanhã, 09:00" or "seg., 3/11, 09:00". */
 export function formatReminder(ts: number): string {
@@ -101,12 +102,12 @@ export function formatReminder(ts: number): string {
   const today = new Date();
   const tomorrow = new Date();
   tomorrow.setDate(today.getDate() + 1);
-  if (d.toDateString() === today.toDateString()) return `hoje, ${reminderTime.format(d)}`;
-  if (d.toDateString() === tomorrow.toDateString()) return `amanhã, ${reminderTime.format(d)}`;
+  if (d.toDateString() === today.toDateString()) return t('hoje, {time}', { time: reminderTime.format(d) });
+  if (d.toDateString() === tomorrow.toDateString()) return t('amanhã, {time}', { time: reminderTime.format(d) });
   return reminderFormat.format(d);
 }
 
-const dayFormat = new Intl.DateTimeFormat('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' });
+const dayFormat = new Intl.DateTimeFormat(locale, { weekday: 'long', day: 'numeric', month: 'long' });
 
 /** "Hoje", "Amanhã" or "quinta-feira, 3 de dezembro", for grouping by day. */
 export function formatDay(ts: number): string {
@@ -114,8 +115,8 @@ export function formatDay(ts: number): string {
   const today = new Date();
   const tomorrow = new Date();
   tomorrow.setDate(today.getDate() + 1);
-  if (d.toDateString() === today.toDateString()) return 'Hoje';
-  if (d.toDateString() === tomorrow.toDateString()) return 'Amanhã';
+  if (d.toDateString() === today.toDateString()) return t('Hoje');
+  if (d.toDateString() === tomorrow.toDateString()) return t('Amanhã');
   const label = dayFormat.format(d);
   return label.charAt(0).toUpperCase() + label.slice(1);
 }

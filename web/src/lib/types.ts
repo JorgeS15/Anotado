@@ -1,16 +1,17 @@
+import { t } from './i18n';
 export const COLORS = ['yellow', 'orange', 'red', 'pink', 'purple', 'blue', 'green', 'gray', 'white'] as const;
 export type Color = (typeof COLORS)[number];
 
 export const COLOR_LABELS: Record<Color, string> = {
-  yellow: 'Amarelo',
-  orange: 'Laranja',
-  red: 'Vermelho',
-  pink: 'Rosa',
-  purple: 'Roxo',
-  blue: 'Azul',
-  green: 'Verde',
-  gray: 'Cinzento',
-  white: 'Branco',
+  yellow: t('Amarelo'),
+  orange: t('Laranja'),
+  red: t('Vermelho'),
+  pink: t('Rosa'),
+  purple: t('Roxo'),
+  blue: t('Azul'),
+  green: t('Verde'),
+  gray: t('Cinzento'),
+  white: t('Branco'),
 };
 
 export type NoteType = 'text' | 'checklist';
