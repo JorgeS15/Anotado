@@ -12,6 +12,7 @@ Notas simples e coloridas, ao estilo do ColorNote, para usar no PC e no telemóv
 - Notas de **texto** e **checklist**
 - **9 cores** que servem de categorias, com filtro por cor e **nomes para as cores** (ex.: verde = "Compras")
 - Checklists com sub-itens, "Desmarcar tudo", "Apagar concluídos" e concluídos recolhíveis
+- **Lembretes** com notificação no telemóvel e no PC, mesmo com a app fechada
 - **Modelos** de notas (ex.: lista de compras base)
 - Fixar, arquivar e lixo (as notas no lixo são apagadas ao fim de 30 dias, configurável)
 - Pesquisa (ignora acentos), vista em grelha ou em lista, ordenação, tamanho da letra
@@ -74,6 +75,7 @@ docker compose up -d
 | `TRASH_DAYS`       | não         | Dias que as notas ficam no lixo antes de serem apagadas (por omissão `30`).  |
 | `ANOTADO_API_TOKEN` | não        | Token para automações (24+ caracteres). Ver [Automações](docs/automacoes.md). |
 | `TRUST_PROXY`      | não         | `true` (por omissão) atrás do Caddy; `false` se a porta estiver exposta diretamente. |
+| `VAPID_SUBJECT`    | não         | Contacto enviado aos serviços de notificações (`mailto:…` ou `https://…`). |
 | `UPDATE_CHECK`     | não         | `false` para não verificar uma vez por dia se há uma versão nova no GitHub.  |
 | `TZ`               | não         | Fuso horário.                                                                |
 
@@ -140,6 +142,18 @@ Com a app instalada no Android:
 - Um toque longo no ícone mostra os atalhos **Nova nota** e **Nova checklist**.
 - A app pede ao sistema para não apagar as notas guardadas no telemóvel, mesmo com pouco espaço.
 - Quando há uma versão nova, aparece um aviso com o botão **Atualizar**.
+
+## Lembretes
+
+No editor, o sino define um lembrete (daqui a 1 hora, amanhã às 9:00, ou uma data à escolha).
+Na hora certa, o servidor envia uma notificação a todos os dispositivos onde as notificações estão
+ativas, mesmo com a app fechada; tocar na notificação abre a nota.
+
+- Da primeira vez que defines um lembrete num dispositivo, o browser pede autorização para notificações.
+  Podes ativá-las, desativá-las ou enviar um teste em **Menu → Servidor e backups**.
+- No iPhone, as notificações só funcionam com a app instalada no ecrã principal (iOS 16.4 ou mais recente).
+- As notificações passam pelo serviço de push do browser (Google, Apple ou Mozilla), encriptadas:
+  esse serviço não consegue ler o conteúdo. O servidor precisa de poder fazer pedidos HTTPS para fora.
 
 ## Importar do ColorNote
 

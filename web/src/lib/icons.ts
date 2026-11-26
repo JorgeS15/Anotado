@@ -43,6 +43,8 @@ export const ICONS = {
   broom: '<path d="M14 4l6 6M4 20l7.5-7.5M9 11l4 4-3 5H4v-6z"/>',
   chevron: '<path d="M6 9l6 6 6-6"/>',
   template: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h4" stroke-dasharray="2 2"/>',
+  bell: '<path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
+  bellOff: '<path d="M8.7 3A6 6 0 0 1 18 8a21.3 21.3 0 0 0 .6 5M17 17H3s3-2 3-9a4.67 4.67 0 0 1 .3-1.7M10.3 21a1.94 1.94 0 0 0 3.4 0M2 2l20 20"/>',
 } as const;
 
 export type IconName = keyof typeof ICONS;

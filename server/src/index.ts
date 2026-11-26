@@ -5,7 +5,9 @@ import { createApp } from './app.ts';
 import { generateSecret } from './auth.ts';
 import { dailyBackup, listBackups } from './backup.ts';
 import { Store } from './db.ts';
+import { sendDueReminders } from './reminders.ts';
 import { WebDavUploader } from './remote.ts';
+import { generateVapidKeys, type VapidKeys } from './webpush.ts';
 import { UpdateChecker } from './updates.ts';
 
 const port = Number(process.env.PORT ?? 4008);
@@ -56,6 +58,16 @@ if (!secret) {
   store.setMeta('session_secret', secret);
 }
 
+// Keys for Web Push, generated once and kept in the database.
+let vapid: VapidKeys;
+try {
+  vapid = JSON.parse(store.getMeta('vapid') ?? '');
+} catch {
+  vapid = generateVapidKeys();
+  store.setMeta('vapid', JSON.stringify(vapid));
+}
+const push = { keys: vapid, subject: process.env.VAPID_SUBJECT || 'https://github.com/JorgeS15/Anotado' };
+
 const updates = updateCheck ? new UpdateChecker(version) : undefined;
 const { app, broadcast } = createApp({
   store,
@@ -70,6 +82,7 @@ const { app, broadcast } = createApp({
   dbFile,
   updates,
   remote,
+  push,
 });
 
 const purge = () => {
@@ -77,6 +90,21 @@ const purge = () => {
 };
 purge();
 setInterval(purge, 6 * 60 * 60 * 1000).unref();
+
+let sending = false;
+const reminders = async () => {
+  if (sending) return;
+  sending = true;
+  try {
+    await sendDueReminders(store, push, (note) => broadcast({ type: 'reminder', id: note.id }));
+  } catch (err) {
+    console.error('Reminders failed:', err);
+  } finally {
+    sending = false;
+  }
+};
+void reminders();
+setInterval(reminders, 20 * 1000).unref();
 
 const backup = () => {
   if (!(backupKeep > 0)) return;

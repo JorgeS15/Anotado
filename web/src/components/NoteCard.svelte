@@ -1,7 +1,7 @@
 <script lang="ts">
   import { highlight } from '../lib/highlight';
   import type { Note } from '../lib/types';
-  import { formatShort, normalize } from '../lib/util';
+  import { formatReminder, formatShort, normalize } from '../lib/util';
   import Icon from './Icon.svelte';
 
   let {
@@ -168,6 +168,12 @@
   {/if}
 
   <span class="date">
+    {#if note.reminder_at != null && note.deleted_at == null}
+      <span class="reminder" class:past={note.reminder_at < Date.now()} title="Lembrete">
+        <Icon name="bell" size={14} />
+        {formatReminder(note.reminder_at)}
+      </span>
+    {/if}
     {#if warning}<span class="warn" title={warning}><Icon name="warning" size={14} /> Não sincronizada</span>{/if}
     {formatShort(note.updated_at)}
   </span>
@@ -191,6 +197,22 @@
     border: 1px solid var(--border);
     overflow: hidden;
     transition: transform 0.12s ease;
+  }
+
+  .reminder {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    margin-right: 6px;
+    padding: 1px 7px 1px 5px;
+    border-radius: 999px;
+    background: color-mix(in srgb, currentColor 10%, transparent);
+    font-weight: 600;
+  }
+
+  .reminder.past {
+    opacity: 0.6;
+    text-decoration: line-through;
   }
 
   .card.reorderable {

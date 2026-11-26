@@ -22,6 +22,7 @@
   import ColorPicker from './ColorPicker.svelte';
   import Icon from './Icon.svelte';
   import Popover from './Popover.svelte';
+  import ReminderPicker from './ReminderPicker.svelte';
 
   let {
     id,
@@ -254,6 +255,7 @@
       id: uid(),
       items: copy.items.map((i) => ({ ...i, id: uid() })),
       pinned: false,
+      reminder_at: null,
       created_at: time,
       updated_at: time,
       synced: undefined,
@@ -293,6 +295,13 @@
           <button class="icon-btn" class:active={note.pinned} onclick={togglePin} title={note.pinned ? 'Desafixar' : 'Fixar'}>
             <Icon name="pin" />
           </button>
+          <ReminderPicker
+            value={note.reminder_at}
+            onchange={(at) => {
+              note.reminder_at = at;
+              changed();
+            }}
+            {notify} />
           <Popover bind:open={colorOpen}>
             {#snippet trigger(toggle)}
               <button class="icon-btn" onclick={toggle} title="Cor"><Icon name="palette" /></button>

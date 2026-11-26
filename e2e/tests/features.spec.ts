@@ -257,3 +257,31 @@ test('signing out the other devices sends them to the login screen', async ({ pa
   await expect(page.locator('.search input')).toBeVisible();
   await phone.context.close();
 });
+
+test('a due reminder shows in the open app and opens its note', async ({ page }) => {
+  test.setTimeout(60_000);
+  await login(page);
+  await page.click('.fab-btn');
+  await page.click('.fab >> text=Texto');
+  await page.fill('.editor .title', 'Ligar à avó');
+  await page.fill('.editor .content', 'Domingo');
+  await page.click('.editor button[title="Lembrete"]');
+  // A time a little in the past is due at once.
+  const past = new Date(Date.now() - 60_000);
+  const local = new Date(past.getTime() - past.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+  await page.fill('.editor input[type=datetime-local]', local);
+  await page.click('.editor >> text=Definir');
+  await expect(page.locator('.toast')).toContainText('Lembrete para');
+  await page.keyboard.press('Escape');
+  await expect(card(page, 'Ligar à avó').locator('.reminder')).toBeVisible();
+
+  // The server checks every 20 seconds.
+  await expect(page.locator('.toast')).toContainText('Lembrete: Ligar à avó', { timeout: 30_000 });
+  await page.locator('.toast button', { hasText: 'Abrir' }).click();
+  await expect(page.locator('.editor .title')).toHaveValue('Ligar à avó');
+
+  await page.click('.editor button[title="Lembrete"]');
+  await page.click('.editor >> text=Remover lembrete');
+  await page.keyboard.press('Escape');
+  await expect(card(page, 'Ligar à avó').locator('.reminder')).toHaveCount(0);
+});

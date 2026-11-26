@@ -20,6 +20,7 @@ import {
   type Note,
   type Settings,
 } from './notes.ts';
+import { notifyAll, type PushConfig } from './reminders.ts';
 import type { WebDavUploader } from './remote.ts';
 import type { UpdateChecker } from './updates.ts';
 
@@ -29,7 +30,9 @@ export type ServerEvent =
   | { type: 'reload' }
   | { type: 'settings'; settings: Settings }
   /** Sessions were revoked: live connections of signed-out devices close. */
-  | { type: 'sessions' };
+  | { type: 'sessions' }
+  /** A reminder is due: open devices show it too. */
+  | { type: 'reminder'; id: string };
 
 export interface AppOptions {
   store: Store;
@@ -50,6 +53,8 @@ export interface AppOptions {
   updates?: UpdateChecker;
   /** Copies backups to WebDAV, if configured. */
   remote?: WebDavUploader;
+  /** Web Push for reminders. */
+  push?: PushConfig;
 }
 
 export function createApp({
@@ -65,6 +70,7 @@ export function createApp({
   dbFile,
   updates,
   remote,
+  push,
 }: AppOptions) {
   const app = new Hono();
   const sessions = new Sessions(secret, password, Number(store.getMeta('session_epoch') ?? 0) || 0);
@@ -186,6 +192,8 @@ export function createApp({
     const body = await c.req.json();
     const note = validateNote(body);
     if (note.id !== c.req.param('id')) throw new ValidationError('id mismatch');
+    // Devices on an older version don't send reminders: keep the one the note has.
+    if (!('reminder_at' in body)) note.reminder_at = store.get(note.id)?.reminder_at ?? null;
     // `synced` is the server version this edit started from, used to detect concurrent edits.
     const base = typeof body.synced === 'number' ? body.synced : undefined;
     const result = store.upsert(note, { base, client: clientId(c) });
@@ -231,6 +239,45 @@ export function createApp({
     const result = addItems(store, await c.req.json(), clientId(c) ?? 'api');
     broadcast({ type: 'upsert', note: result.note });
     return c.json(result);
+  });
+
+  // --- Push notifications ---------------------------------------------------------
+
+  app.get('/api/push/key', (c) => c.json({ publicKey: push?.keys.publicKey ?? null }));
+
+  const subscription = (body: unknown) => {
+    const b = (body ?? {}) as { endpoint?: unknown; keys?: { p256dh?: unknown; auth?: unknown } };
+    const ok =
+      typeof b.endpoint === 'string' &&
+      b.endpoint.length <= 1000 &&
+      /^https:\/\//.test(b.endpoint) &&
+      typeof b.keys?.p256dh === 'string' &&
+      b.keys.p256dh.length <= 200 &&
+      typeof b.keys?.auth === 'string' &&
+      b.keys.auth.length <= 100;
+    if (!ok) throw new ValidationError('invalid push subscription');
+    return { endpoint: b.endpoint as string, keys: { p256dh: b.keys!.p256dh as string, auth: b.keys!.auth as string } };
+  };
+
+  app.post('/api/push/subscribe', async (c) => {
+    store.addSubscription(subscription(await c.req.json()));
+    return c.json({ ok: true });
+  });
+
+  app.post('/api/push/unsubscribe', async (c) => {
+    const body = await c.req.json();
+    if (typeof body?.endpoint === 'string') store.removeSubscription(body.endpoint);
+    return c.json({ ok: true });
+  });
+
+  app.post('/api/push/test', async (c) => {
+    if (!push) return c.json({ error: 'push is not configured' }, 400);
+    const sent = await notifyAll(store, push, {
+      title: 'Anotado',
+      body: 'As notificações estão a funcionar.',
+      id: '',
+    });
+    return c.json({ sent });
   });
 
   // --- Settings (shared by every device) --------------------------------------

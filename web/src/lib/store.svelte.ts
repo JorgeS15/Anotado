@@ -113,6 +113,8 @@ class NoteStore {
   trashDays = $state(30);
   /** A newer release the server knows about. */
   newVersion = $state<UpdateInfo | null>(null);
+  /** Called when the server says a reminder is due, so an open app can show it. */
+  onreminder: ((id: string) => void) | undefined;
 
   /** Bumped on every outbox write, so a finished request knows if it is stale. */
   private versions = new Map<string, number>();
@@ -483,6 +485,7 @@ class NoteStore {
         del(event.id, notesDb).catch(() => {});
       } else if (event.type === 'reload') this.pull();
       else if (event.type === 'settings') this.applySettings(event.settings);
+      else if (event.type === 'reminder') this.onreminder?.(event.id);
     });
     source.addEventListener('error', () => {
       if (source.readyState === EventSource.CLOSED) {

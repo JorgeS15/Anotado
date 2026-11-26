@@ -91,3 +91,17 @@ export function setHiddenDone(id: string, hidden: boolean): void {
     /* ignore */
   }
 }
+
+const reminderFormat = new Intl.DateTimeFormat('pt-PT', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+const reminderTime = new Intl.DateTimeFormat('pt-PT', { hour: '2-digit', minute: '2-digit' });
+
+/** "hoje, 18:00", "amanhã, 09:00" or "seg., 3/11, 09:00". */
+export function formatReminder(ts: number): string {
+  const d = new Date(ts);
+  const today = new Date();
+  const tomorrow = new Date();
+  tomorrow.setDate(today.getDate() + 1);
+  if (d.toDateString() === today.toDateString()) return `hoje, ${reminderTime.format(d)}`;
+  if (d.toDateString() === tomorrow.toDateString()) return `amanhã, ${reminderTime.format(d)}`;
+  return reminderFormat.format(d);
+}

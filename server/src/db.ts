@@ -16,6 +16,7 @@ interface NoteRow {
   deleted_at: number | null;
   created_at: number;
   updated_at: number;
+  reminder_at: number | null;
 }
 
 export interface NoteVersion {
@@ -58,7 +59,13 @@ function fromRow(row: NoteRow): Note {
     deleted_at: row.deleted_at,
     created_at: row.created_at,
     updated_at: row.updated_at,
+    reminder_at: row.reminder_at ?? null,
   };
+}
+
+export interface StoredSubscription {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
 }
 
 export function sameContent(a: Note, b: Note): boolean {
@@ -108,6 +115,18 @@ export class Store {
     if (!columns.some((c) => c.name === 'last_client')) {
       this.db.exec('ALTER TABLE notes ADD COLUMN last_client TEXT');
     }
+    if (!columns.some((c) => c.name === 'reminder_at')) {
+      // reminded_at: the reminder_at a notification was last sent for.
+      this.db.exec('ALTER TABLE notes ADD COLUMN reminder_at INTEGER; ALTER TABLE notes ADD COLUMN reminded_at INTEGER;');
+    }
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS push_subscriptions (
+        endpoint TEXT PRIMARY KEY,
+        p256dh TEXT NOT NULL,
+        auth TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      );
+    `);
   }
 
   all(): Note[] {
@@ -130,13 +149,13 @@ export class Store {
   private write(note: Note, client: string | null) {
     this.db
       .prepare(
-        `INSERT INTO notes (id, type, title, content, items, color, pinned, archived, deleted_at, created_at, updated_at, last_client)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO notes (id, type, title, content, items, color, pinned, archived, deleted_at, created_at, updated_at, last_client, reminder_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
            type = excluded.type, title = excluded.title, content = excluded.content, items = excluded.items,
            color = excluded.color, pinned = excluded.pinned, archived = excluded.archived,
            deleted_at = excluded.deleted_at, created_at = excluded.created_at, updated_at = excluded.updated_at,
-           last_client = excluded.last_client`,
+           last_client = excluded.last_client, reminder_at = excluded.reminder_at`,
       )
       .run(
         note.id,
@@ -151,6 +170,7 @@ export class Store {
         note.created_at,
         note.updated_at,
         client,
+        note.reminder_at ?? null,
       );
   }
 
@@ -212,6 +232,45 @@ export class Store {
     const ids = rows.map((r) => r.id);
     for (const id of ids) this.db.prepare('DELETE FROM note_versions WHERE note_id = ?').run(id);
     return ids;
+  }
+
+  // --- Reminders -------------------------------------------------------------
+
+  /** Notes whose reminder is due and was not sent yet (not in the trash). */
+  dueReminders(now: number): Note[] {
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM notes WHERE reminder_at IS NOT NULL AND reminder_at <= ? AND deleted_at IS NULL
+           AND (reminded_at IS NULL OR reminded_at <> reminder_at)`,
+      )
+      .all(now) as unknown as NoteRow[];
+    return rows.map(fromRow);
+  }
+
+  markReminded(id: string, reminderAt: number) {
+    this.db.prepare('UPDATE notes SET reminded_at = ? WHERE id = ?').run(reminderAt, id);
+  }
+
+  subscriptions(): StoredSubscription[] {
+    const rows = this.db.prepare('SELECT endpoint, p256dh, auth FROM push_subscriptions').all() as unknown as {
+      endpoint: string;
+      p256dh: string;
+      auth: string;
+    }[];
+    return rows.map((r) => ({ endpoint: r.endpoint, keys: { p256dh: r.p256dh, auth: r.auth } }));
+  }
+
+  addSubscription(sub: StoredSubscription, now = Date.now()) {
+    this.db
+      .prepare(
+        `INSERT INTO push_subscriptions (endpoint, p256dh, auth, created_at) VALUES (?, ?, ?, ?)
+         ON CONFLICT(endpoint) DO UPDATE SET p256dh = excluded.p256dh, auth = excluded.auth`,
+      )
+      .run(sub.endpoint, sub.keys.p256dh, sub.keys.auth, now);
+  }
+
+  removeSubscription(endpoint: string) {
+    this.db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').run(endpoint);
   }
 
   // --- History ---------------------------------------------------------------

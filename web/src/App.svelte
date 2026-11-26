@@ -15,6 +15,7 @@
   import Templates from './components/Templates.svelte';
   import { now } from './lib/clock';
   import { pwa } from './lib/pwa.svelte';
+  import { refreshPush } from './lib/push';
   import { colorLabel, store } from './lib/store.svelte';
   import {
     COLORS,
@@ -49,7 +50,9 @@
 
   let editing = $state<{ id: string; draft?: Note } | null>(null);
   let editor = $state<ReturnType<typeof Editor>>();
-  let toast = $state<{ message: string; undo?: () => void; key: number } | null>(null);
+  let toast = $state<{ message: string; undo?: () => void; action?: { label: string; run: () => void }; key: number } | null>(
+    null,
+  );
   let sortOpen = $state(false);
   let fabOpen = $state(false);
   let searchEl = $state<HTMLInputElement>();
@@ -61,6 +64,8 @@
 
   /** A note to create from the URL: Android share target or app shortcut. */
   let pendingLaunch: { type: NoteType; title?: string; content?: string } | null = null;
+  /** A note to open from the URL, e.g. after tapping a reminder. */
+  let pendingOpen = $state<string | null>(null);
 
   onMount(() => {
     const url = new URL(location.href);
@@ -72,10 +77,35 @@
       pendingLaunch = { type: 'text', title, content };
     } else if (url.searchParams.get('new') === 'text' || url.searchParams.get('new') === 'checklist') {
       pendingLaunch = { type: url.searchParams.get('new') as NoteType };
+    } else if (url.searchParams.get('note')) {
+      pendingOpen = url.searchParams.get('note');
     }
-    if (pendingLaunch || url.pathname !== '/') history.replaceState(null, '', '/');
+    if (pendingLaunch || pendingOpen || url.pathname !== '/') history.replaceState(null, '', '/');
     else if (history.state) history.replaceState(null, '');
+    // A reminder tapped while the app is already open.
+    navigator.serviceWorker?.addEventListener('message', (e) => {
+      if (e.data?.type === 'open-note' && e.data.id) pendingOpen = e.data.id;
+    });
+    store.onreminder = (id) => {
+      const note = store.notes[id];
+      if (!note) return;
+      const title = note.title.trim() || note.content.trim().split('\n')[0] || 'nota';
+      notify(`Lembrete: ${title.slice(0, 60)}`, undefined, { label: 'Abrir', run: () => openNote(id) });
+    };
     store.init();
+  });
+
+  $effect(() => {
+    if (store.auth !== 'yes' || !pendingOpen || !store.notes[pendingOpen]) return;
+    const id = pendingOpen;
+    pendingOpen = null;
+    if (editing?.id === id) return;
+    if (editing) switchNote(id);
+    else openNote(id);
+  });
+
+  $effect(() => {
+    if (store.auth === 'yes') refreshPush();
   });
 
   $effect(() => {
@@ -348,10 +378,10 @@
   // --- Actions -----------------------------------------------------------------
 
   let toastTimer: ReturnType<typeof setTimeout>;
-  function notify(message: string, undo?: () => void) {
+  function notify(message: string, undo?: () => void, action?: { label: string; run: () => void }) {
     clearTimeout(toastTimer);
-    toast = { message, undo, key: Date.now() };
-    toastTimer = setTimeout(() => (toast = null), 5000);
+    toast = { message, undo, action, key: Date.now() };
+    toastTimer = setTimeout(() => (toast = null), action ? 10_000 : 5000);
   }
 
   function emptyTrash() {
@@ -609,6 +639,13 @@
     {#key toast.key}
       <div class="toast" role="status">
         <span>{toast.message}</span>
+        {#if toast.action}
+          <button
+            onclick={() => {
+              toast?.action?.run();
+              toast = null;
+            }}>{toast.action.label}</button>
+        {/if}
         {#if toast.undo}
           <button
             onclick={() => {

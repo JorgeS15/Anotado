@@ -15,6 +15,7 @@ Self-hosted with Docker, single user, works offline. The interface is in Portugu
 - **Text** and **checklist** notes
 - **9 colours** used as categories, with a colour filter and **colour names** (e.g. green = "Groceries")
 - Checklists with sub-items, "uncheck all", "delete done" and collapsible done items
+- **Reminders** with notifications on phone and computer, even when the app is closed
 - Note **templates** (e.g. a base shopping list)
 - Pin, archive and trash (notes in the trash are deleted after 30 days, configurable)
 - Search (accent-insensitive), grid or list view, sorting, font size
@@ -74,6 +75,7 @@ docker compose up -d
 | `TRASH_DAYS`        | no       | Days notes stay in the trash before being deleted (default `30`).          |
 | `ANOTADO_API_TOKEN` | no       | Token for automations (24+ characters). See [Automations](#automations).    |
 | `TRUST_PROXY`       | no       | `true` (default) behind a reverse proxy; `false` if the port is exposed directly. |
+| `VAPID_SUBJECT`     | no       | Contact sent to push services (`mailto:…` or `https://…`).                  |
 | `UPDATE_CHECK`      | no       | `false` to stop checking GitHub once a day for a new release.               |
 | `TZ`                | no       | Time zone.                                                                  |
 
@@ -119,6 +121,15 @@ Open the address in **Chrome** (Android), sign in and choose **Anotado menu → 
 
 On Android, Anotado then appears in other apps' **Share** menu (shared text and links become a new
 note), and a long press on its icon offers **new note** and **new checklist** shortcuts.
+
+## Reminders
+
+The bell in the editor sets a reminder. When it is due, the server sends a notification to every
+device with notifications on, even with the app closed; tapping it opens the note. The first time,
+the browser asks for permission; **Menu → Servidor e backups** turns notifications on or off and
+sends a test. On iPhone, notifications need the app installed on the home screen (iOS 16.4+).
+Notifications go through the browser's push service, end-to-end encrypted (Web Push, no third-party
+account needed).
 
 ## Import from ColorNote
 

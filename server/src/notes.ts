@@ -33,6 +33,8 @@ export interface Note {
   deleted_at: number | null;
   created_at: number;
   updated_at: number;
+  /** When to send a notification for this note, if ever. */
+  reminder_at?: number | null;
 }
 
 export class ValidationError extends Error {}
@@ -94,6 +96,7 @@ export function validateNote(input: unknown): Note {
     deleted_at: n.deleted_at === null || n.deleted_at === undefined ? null : time(n.deleted_at, 'deleted_at'),
     created_at: n.created_at === undefined ? updated_at : time(n.created_at, 'created_at'),
     updated_at,
+    reminder_at: n.reminder_at === null || n.reminder_at === undefined ? null : time(n.reminder_at, 'reminder_at'),
   };
 }
 

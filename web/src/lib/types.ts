@@ -35,6 +35,8 @@ export interface Note {
   deleted_at: number | null;
   created_at: number;
   updated_at: number;
+  /** When to notify about this note. */
+  reminder_at?: number | null;
   /** Local only: the server `updated_at` this device last saw for the note. */
   synced?: number;
 }

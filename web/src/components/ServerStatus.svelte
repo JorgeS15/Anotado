@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { disablePush, enablePush, pushState, testPush, type PushState } from '../lib/push';
   import { store } from '../lib/store.svelte';
   import type { BackupInfo, ServerStatus } from '../lib/types';
   import { formatFull } from '../lib/util';
@@ -11,8 +12,30 @@
   let status = $state<ServerStatus | null>(null);
   let error = $state('');
   let busy = $state<string | null>(null);
+  let push = $state<PushState | null>(null);
 
-  onMount(load);
+  onMount(() => {
+    load();
+    pushState().then((s) => (push = s));
+  });
+
+  async function togglePush() {
+    try {
+      push = push === 'on' ? await disablePush() : await enablePush();
+      if (push === 'denied') notify('As notificações estão bloqueadas: permite-as nas definições do browser.');
+    } catch {
+      notify('Não foi possível ativar as notificações neste dispositivo.');
+    }
+  }
+
+  async function test() {
+    try {
+      const sent = await testPush();
+      notify(sent ? `Notificação de teste enviada para ${sent} ${sent === 1 ? 'dispositivo' : 'dispositivos'}.` : 'Nenhum dispositivo recebeu a notificação.');
+    } catch {
+      notify('Não foi possível enviar (sem ligação?).');
+    }
+  }
 
   async function load() {
     try {
@@ -75,6 +98,27 @@
       Token de API (automações): {status.api_token ? 'ativo' : 'desligado'}.
       {#if !status.api_token}Define <code>ANOTADO_API_TOKEN</code> no servidor para o ligar.{/if}
     </p>
+
+    <h3>Notificações dos lembretes</h3>
+    <div class="push">
+      <p class="info">
+        {#if push === null}
+          A verificar…
+        {:else if push === 'on'}
+          Ativas neste dispositivo.
+        {:else if push === 'denied'}
+          Bloqueadas neste dispositivo. Permite-as nas definições do browser ou da app.
+        {:else if push === 'unsupported'}
+          Este browser não suporta notificações. No iPhone, instala primeiro a app no ecrã principal.
+        {:else}
+          Desligadas neste dispositivo.
+        {/if}
+      </p>
+      {#if push === 'on' || push === 'off'}
+        <button class="btn ghost" onclick={togglePush}>{push === 'on' ? 'Desligar' : 'Ativar'}</button>
+      {/if}
+      {#if push === 'on'}<button class="btn ghost" onclick={test}>Testar</button>{/if}
+    </div>
 
     <h3>Backups diários</h3>
     {#if status.remote}
@@ -179,6 +223,21 @@
   h3 {
     margin: 18px 0 4px;
     font-size: 1rem;
+  }
+
+  .push {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .push .info {
+    flex: 1 1 200px;
+  }
+
+  .push .btn {
+    padding: 7px 14px;
   }
 
   .backups {
